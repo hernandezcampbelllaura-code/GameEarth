@@ -40,7 +40,7 @@ class _AuthScreenState extends State<AuthScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e.code));
+      setState(() => _error = _message(e.code, e.message));
     } catch (e) {
       setState(() => _error = 'Error: $e');
     } finally {
@@ -58,11 +58,11 @@ class _AuthScreenState extends State<AuthScreen> {
           .sendPasswordResetEmail(email: _email.text.trim());
       setState(() => _error = 'Te enviamos un correo para restablecerla.');
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e.code));
+      setState(() => _error = _message(e.code, e.message));
     }
   }
 
-  String _message(String code) {
+  String _message(String code, [String? detail]) {
     switch (code) {
       case 'invalid-email':
         return 'Correo no válido.';
@@ -77,7 +77,8 @@ class _AuthScreenState extends State<AuthScreen> {
       case 'network-request-failed':
         return 'Sin conexión a internet.';
       default:
-        return 'No se pudo continuar ($code).';
+        return 'No se pudo continuar ($code)'
+            '${detail == null || detail.isEmpty ? '' : ': $detail'}';
     }
   }
 
