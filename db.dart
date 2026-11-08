@@ -1,8 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+
+import '../firebase_options.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -22,12 +28,17 @@ class Db {
 
   // ---------- Publicaciones ----------
 
-  static Future<void> createPost(String text, String imageUrl) {
+  static Future<void> createPost(
+    String text,
+    String imageUrl, {
+    String videoUrl = '',
+  }) {
     return posts.add({
       'authorId': myUid,
       'authorName': Session.i.username,
       'text': text,
       'imageUrl': imageUrl,
+      'videoUrl': videoUrl,
       'createdAt': FieldValue.serverTimestamp(),
       'likesCount': 0,
       'commentsCount': 0,
@@ -226,5 +237,87 @@ class Session {
     blocked.value = {};
     following.value = {};
     isAdmin.value = false;
+  }
+}
+
+class MediaException implements Exception {
+  final String message;
+  const MediaException(this.message);
+  @override
+  String toString() => message;
+}
+
+/// Un archivo elegido de la galería, todavía sin subir.
+class PickedMedia {
+  final String path;
+  final bool isVideo;
+  const PickedMedia(this.path, this.isVideo);
+}
+
+/// Elegir fotos y videos de la galería del teléfono y subirlos a Cloudinary.
+/// El selector del sistema se abre solo y no pide permisos peligrosos: la app
+/// únicamente recibe el archivo que la persona elige.
+class Media {
+  Media._();
+  static final ImagePicker _picker = ImagePicker();
+
+  static const int _maxVideoBytes = 90 * 1024 * 1024;
+
+  static Future<PickedMedia?> pickImage({double maxWidth = 1600}) async {
+    final f = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: maxWidth,
+      imageQuality: 80,
+    );
+    return f == null ? null : PickedMedia(f.path, false);
+  }
+
+  static Future<PickedMedia?> pickVideo() async {
+    final f = await _picker.pickVideo(source: ImageSource.gallery);
+    if (f == null) return null;
+    final size = await File(f.path).length();
+    if (size > _maxVideoBytes) {
+      throw const MediaException(
+        'El video pesa más de 90 MB. Elige uno más corto.',
+      );
+    }
+    return PickedMedia(f.path, true);
+  }
+
+  /// Sube el archivo y devuelve su dirección https.
+  static Future<String> upload(PickedMedia m) async {
+    if (!MediaConfig.ready) {
+      throw const MediaException(
+        'Falta configurar Cloudinary en firebase_options.dart',
+      );
+    }
+    final type = m.isVideo ? 'video' : 'image';
+    final uri = Uri.parse(
+      'https://api.cloudinary.com/v1_1/${MediaConfig.cloudName}/$type/upload',
+    );
+    final req = http.MultipartRequest('POST', uri)
+      ..fields['upload_preset'] = MediaConfig.uploadPreset
+      ..files.add(await http.MultipartFile.fromPath('file', m.path));
+
+    final streamed = await req.send().timeout(const Duration(minutes: 6));
+    final res = await http.Response.fromStream(streamed);
+
+    Map<String, dynamic> body = {};
+    try {
+      body = jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {}
+
+    if (res.statusCode != 200) {
+      final err = body['error'];
+      final msg = err is Map ? err['message'] : null;
+      throw MediaException(
+        'No se pudo subir el archivo: ${msg ?? 'código ${res.statusCode}'}',
+      );
+    }
+    final url = body['secure_url'];
+    if (url is! String || url.isEmpty) {
+      throw const MediaException('Respuesta inesperada al subir el archivo.');
+    }
+    return url;
   }
 }

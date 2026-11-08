@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 import '../screens/profile_screen.dart';
 import '../services/db.dart';
@@ -61,6 +62,7 @@ class PostCard extends StatelessWidget {
     final author = (d['authorName'] ?? 'usuario') as String;
     final text = (d['text'] ?? '') as String;
     final img = (d['imageUrl'] ?? '') as String;
+    final video = (d['videoUrl'] ?? '') as String;
     final likes = ((d['likesCount'] ?? 0) as num).toInt();
     final comments = ((d['commentsCount'] ?? 0) as num).toInt();
     final mine = authorId == myUid;
@@ -153,6 +155,14 @@ class PostCard extends StatelessWidget {
                 ),
               ),
             ),
+          if (video.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, right: 6),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _VideoBox(url: video),
+              ),
+            ),
           Row(
             children: [
               StreamBuilder<DocumentSnapshot<Json>>(
@@ -189,6 +199,107 @@ class PostCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Video dentro de la publicación. No descarga nada hasta que se toca play,
+/// así no se gastan datos al hacer scroll por el feed.
+class _VideoBox extends StatefulWidget {
+  final String url;
+  const _VideoBox({required this.url});
+
+  @override
+  State<_VideoBox> createState() => _VideoBoxState();
+}
+
+class _VideoBoxState extends State<_VideoBox> {
+  VideoPlayerController? _c;
+  bool _loading = false;
+
+  // Cloudinary genera la miniatura del primer cuadro cambiando la dirección.
+  String get _poster => widget.url
+      .replaceFirst('/upload/', '/upload/so_0,w_900,c_limit/')
+      .replaceFirst(RegExp(r'\.[A-Za-z0-9]+$'), '.jpg');
+
+  Future<void> _start() async {
+    setState(() => _loading = true);
+    try {
+      final c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      await c.initialize();
+      await c.setLooping(true);
+      await c.play();
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
+      setState(() => _c = c);
+    } catch (_) {
+      if (mounted) toast(context, 'No se pudo reproducir el video');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _c?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _c;
+    if (c != null && c.value.isInitialized) {
+      return GestureDetector(
+        onTap: () => setState(() {
+          if (c.value.isPlaying) {
+            c.pause();
+          } else {
+            c.play();
+          }
+        }),
+        child: AspectRatio(
+          aspectRatio: c.value.aspectRatio,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              VideoPlayer(c),
+              if (!c.value.isPlaying)
+                const Icon(
+                  Icons.play_circle_fill,
+                  size: 64,
+                  color: Colors.white70,
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: _loading ? null : _start,
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              _poster,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) => Container(color: Colors.black),
+            ),
+            Center(
+              child: _loading
+                  ? const CircularProgressIndicator()
+                  : const Icon(
+                      Icons.play_circle_fill,
+                      size: 64,
+                      color: Colors.white70,
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

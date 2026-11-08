@@ -44,60 +44,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _edit(Json u) async {
     final bio = TextEditingController(text: (u['bio'] ?? '') as String);
-    final photo = TextEditingController(text: (u['photoUrl'] ?? '') as String);
     final games = TextEditingController(
       text: ((u['favoriteGames'] as List?) ?? const []).join(', '),
     );
+    var photoUrl = (u['photoUrl'] ?? '') as String;
+    var uploading = false;
+    String? error;
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar perfil'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: bio,
-                maxLength: 160,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Bio'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: photo,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Enlace de foto de perfil',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Editar perfil'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  radius: 44,
+                  backgroundImage:
+                      photoUrl.isEmpty ? null : NetworkImage(photoUrl),
+                  child: photoUrl.isEmpty
+                      ? const Icon(Icons.person, size: 44)
+                      : null,
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: games,
-                decoration: const InputDecoration(
-                  labelText: 'Juegos favoritos (separados por coma)',
+                TextButton.icon(
+                  onPressed: uploading
+                      ? null
+                      : () async {
+                          try {
+                            final m = await Media.pickImage(maxWidth: 700);
+                            if (m == null) return;
+                            setD(() {
+                              uploading = true;
+                              error = null;
+                            });
+                            final url = await Media.upload(m);
+                            setD(() {
+                              photoUrl = url;
+                              uploading = false;
+                            });
+                          } catch (e) {
+                            setD(() {
+                              uploading = false;
+                              error = '$e';
+                            });
+                          }
+                        },
+                  icon: uploading
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.photo_library_outlined),
+                  label: Text(
+                    uploading ? 'Subiendo…' : 'Elegir foto de la galería',
+                  ),
                 ),
-              ),
-            ],
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      error!,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
+                TextField(
+                  controller: bio,
+                  maxLength: 160,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Bio'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: games,
+                  decoration: const InputDecoration(
+                    labelText: 'Juegos favoritos (separados por coma)',
+                  ),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: uploading ? null : () => Navigator.pop(ctx, true),
+              child: const Text('Guardar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     if (ok != true || !mounted) return;
-    final photoUrl = photo.text.trim();
-    if (photoUrl.isNotEmpty && !photoUrl.startsWith('http')) {
-      toast(context, 'El enlace de la foto debe empezar con http');
-      return;
-    }
     final list = games.text
         .split(',')
         .map((e) => e.trim())
