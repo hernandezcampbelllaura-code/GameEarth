@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
+import 'auth_screen.dart';
 
 /// Se muestra una sola vez, cuando la cuenta nueva aún no tiene perfil.
 class ProfileSetupScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class ProfileSetupScreen extends StatefulWidget {
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final _name = TextEditingController();
   bool _busy = false;
+  bool _accepted = TermsState.accepted;
   String? _error;
 
   @override
@@ -26,6 +28,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final name = _name.text.trim();
     if (!RegExp(r'^[A-Za-z0-9_]{3,20}$').hasMatch(name)) {
       setState(() => _error = '3 a 20 caracteres: letras, números o _');
+      return;
+    }
+    if (!_accepted) {
+      setState(() => _error = 'Debes aceptar los Términos y Condiciones.');
       return;
     }
     setState(() {
@@ -50,6 +56,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           'photoUrl': '',
           'favoriteGames': <String>[],
           'banned': false,
+          'acceptedTerms': true,
+          'termsVersion': kTermsVersion,
+          'acceptedTermsAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
         });
       });
@@ -92,11 +101,48 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                     errorText: _error,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Checkbox(
+                      value: _accepted,
+                      onChanged: _busy
+                          ? null
+                          : (v) => setState(() => _accepted = v ?? false),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Wrap(
+                          children: [
+                            const Text('Acepto los '),
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const TermsScreen(),
+                                ),
+                              ),
+                              child: Text(
+                                'Términos y Condiciones',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            const Text(' y tengo 18 años o más.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _busy ? null : _save,
+                    onPressed: _busy || !_accepted ? null : _save,
                     child: const Text('Continuar'),
                   ),
                 ),

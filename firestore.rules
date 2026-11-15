@@ -1,0 +1,185 @@
+rules_version = '2';
+
+// Reglas de seguridad de GamingSocial (versión reforzada).
+// Pégalas en Firebase Console > Firestore Database > Reglas > Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admin = existe el documento admins/<uid>. Nadie puede crearlo desde la
+    // app; solo tú, a mano, desde la consola de Firebase.
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Puede escribir: tiene perfil y no está baneado.
+    function canWrite() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && myProfile().banned != true;
+    }
+
+    // Solo se aceptan fotos/videos subidos a TU Cloudinary (o vacío).
+    function okMedia(u) {
+      return u is string
+        && (u == '' || u.matches('https://res\\.cloudinary\\.com/hagnq5mv/.*'));
+    }
+
+    function okText(t, maxLen) {
+      return t is string && t.size() > 0 && t.size() <= maxLen;
+    }
+
+    // Un contador solo puede subir o bajar de 1 en 1.
+    function step(field) {
+      return !(field in request.resource.data.diff(resource.data).affectedKeys())
+        || (request.resource.data[field] - resource.data[field] >= -1
+            && request.resource.data[field] - resource.data[field] <= 1);
+    }
+
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // Nombres de usuario únicos (usernames/<nombre en minúsculas>).
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && name.matches('[a-z0-9_]{3,20}');
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+
+      // Crear tu propio perfil: obligatorio haber aceptado los términos.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+             'username', 'usernameLower', 'email', 'bio', 'photoUrl',
+             'favoriteGames', 'banned', 'acceptedTerms', 'termsVersion',
+             'acceptedTermsAt', 'createdAt'])
+        && request.resource.data.acceptedTerms == true
+        && request.resource.data.termsVersion is int
+        && request.resource.data.acceptedTermsAt == request.time
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.banned == false
+        && request.resource.data.username is string
+        && request.resource.data.username.matches('[A-Za-z0-9_]{3,20}')
+        && request.resource.data.usernameLower == request.resource.data.username.lower()
+        && request.resource.data.bio == ''
+        && request.resource.data.photoUrl == ''
+        && request.resource.data.favoriteGames == [];
+
+      // Editar solo bio, foto y juegos favoritos. 'banned' lo cambia el admin.
+      allow update: if (request.auth.uid == uid
+          && canWrite()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['bio', 'photoUrl', 'favoriteGames'])
+          && request.resource.data.bio is string
+          && request.resource.data.bio.size() <= 160
+          && okMedia(request.resource.data.photoUrl)
+          && request.resource.data.favoriteGames is list
+          && request.resource.data.favoriteGames.size() <= 10)
+        || isAdmin();
+
+      allow delete: if isAdmin();
+
+      match /following/{other} {
+        allow read: if signedIn();
+        allow create: if canWrite() && request.auth.uid == uid
+          && other != uid
+          && request.resource.data.keys().hasOnly(['createdAt']);
+        allow delete: if canWrite() && request.auth.uid == uid;
+      }
+
+      match /followers/{follower} {
+        allow read: if signedIn();
+        allow create: if canWrite() && request.auth.uid == follower
+          && follower != uid
+          && request.resource.data.keys().hasOnly(['createdAt']);
+        allow delete: if canWrite() && request.auth.uid == follower;
+      }
+
+      // Solo tú ves y editas tu lista de bloqueados.
+      match /blocked/{other} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow write: if canWrite() && request.auth.uid == uid;
+      }
+    }
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+
+      allow create: if canWrite()
+        && request.resource.data.keys().hasOnly([
+             'authorId', 'authorName', 'text', 'imageUrl', 'videoUrl',
+             'createdAt', 'likesCount', 'commentsCount'])
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName == myProfile().username
+        && okText(request.resource.data.text, 500)
+        && okMedia(request.resource.data.imageUrl)
+        && okMedia(request.resource.data.videoUrl)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.likesCount == 0
+        && request.resource.data.commentsCount == 0;
+
+      // Cualquiera con permiso puede tocar solo los contadores (de 1 en 1);
+      // el admin puede todo.
+      allow update: if (canWrite()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['likesCount', 'commentsCount'])
+          && step('likesCount')
+          && step('commentsCount'))
+        || isAdmin();
+
+      allow delete: if isAdmin()
+        || (canWrite() && resource.data.authorId == request.auth.uid);
+
+      match /likes/{uid} {
+        allow read: if signedIn();
+        allow create: if canWrite() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['createdAt']);
+        allow delete: if canWrite() && request.auth.uid == uid;
+      }
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if canWrite()
+          && request.resource.data.keys().hasOnly(
+               ['authorId', 'authorName', 'text', 'createdAt'])
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.authorName == myProfile().username
+          && okText(request.resource.data.text, 300)
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isAdmin()
+          || (canWrite() && resource.data.authorId == request.auth.uid);
+      }
+    }
+
+    // Denuncias: cualquiera puede crear una; solo el admin las lee y resuelve.
+    match /reports/{reportId} {
+      allow create: if canWrite()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reporterName == myProfile().username
+        && request.resource.data.type in ['post', 'comment', 'user']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 300
+        && request.resource.data.preview is string
+        && request.resource.data.preview.size() <= 140
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
