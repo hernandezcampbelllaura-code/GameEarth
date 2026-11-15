@@ -33,6 +33,19 @@ service cloud.firestore {
         && (u == '' || u.matches('https://res\\.cloudinary\\.com/hagnq5mv/.*'));
     }
 
+    // Enlace opcional: vacío o http(s) de hasta 300 caracteres.
+    function okLink(u) {
+      return u is string && u.size() <= 300
+        && (u == '' || u.matches('https?://[^ ]+'));
+    }
+
+    // Publicar en un grupo: vacío (publicación normal) o ser miembro.
+    function okGroup(g) {
+      return g is string
+        && (g == ''
+            || exists(/databases/$(database)/documents/groups/$(g)/members/$(request.auth.uid)));
+    }
+
     function okText(t, maxLen) {
       return t is string && t.size() > 0 && t.size() <= maxLen;
     }
@@ -125,12 +138,14 @@ service cloud.firestore {
       allow create: if canWrite()
         && request.resource.data.keys().hasOnly([
              'authorId', 'authorName', 'text', 'imageUrl', 'videoUrl',
-             'createdAt', 'likesCount', 'commentsCount'])
+             'linkUrl', 'groupId', 'createdAt', 'likesCount', 'commentsCount'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName == myProfile().username
         && okText(request.resource.data.text, 500)
         && okMedia(request.resource.data.imageUrl)
         && okMedia(request.resource.data.videoUrl)
+        && okLink(request.resource.data.linkUrl)
+        && okGroup(request.resource.data.groupId)
         && request.resource.data.createdAt == request.time
         && request.resource.data.likesCount == 0
         && request.resource.data.commentsCount == 0;
@@ -165,6 +180,40 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time;
         allow delete: if isAdmin()
           || (canWrite() && resource.data.authorId == request.auth.uid);
+      }
+    }
+
+    // Grupos: cualquiera con cuenta puede crear uno y unirse.
+    match /groups/{groupId} {
+      allow read: if signedIn();
+
+      allow create: if canWrite()
+        && request.resource.data.keys().hasOnly([
+             'name', 'description', 'ownerId', 'ownerName', 'membersCount',
+             'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerName == myProfile().username
+        && okText(request.resource.data.name, 40)
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 200
+        && request.resource.data.membersCount == 1
+        && request.resource.data.createdAt == request.time;
+
+      // Solo cambia el contador de miembros, de 1 en 1.
+      allow update: if canWrite()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['membersCount'])
+        && step('membersCount');
+
+      allow delete: if isAdmin()
+        || (canWrite() && resource.data.ownerId == request.auth.uid);
+
+      match /members/{uid} {
+        allow read: if signedIn();
+        allow create: if canWrite() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['createdAt']);
+        allow delete: if canWrite() && request.auth.uid == uid;
       }
     }
 

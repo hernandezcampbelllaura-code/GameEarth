@@ -7,7 +7,8 @@ import '../util.dart';
 
 class CreateScreen extends StatefulWidget {
   final VoidCallback onDone;
-  const CreateScreen({super.key, required this.onDone});
+  final String groupId; // '' = publicación normal
+  const CreateScreen({super.key, required this.onDone, this.groupId = ''});
 
   @override
   State<CreateScreen> createState() => _CreateScreenState();
@@ -15,12 +16,14 @@ class CreateScreen extends StatefulWidget {
 
 class _CreateScreenState extends State<CreateScreen> {
   final _text = TextEditingController();
+  final _link = TextEditingController();
   PickedMedia? _media;
   bool _busy = false;
 
   @override
   void dispose() {
     _text.dispose();
+    _link.dispose();
     super.dispose();
   }
 
@@ -39,6 +42,12 @@ class _CreateScreenState extends State<CreateScreen> {
       toast(context, 'Escribe una descripción para publicar.');
       return;
     }
+    final rawLink = _link.text.trim();
+    final link = cleanUrl(rawLink);
+    if (rawLink.isNotEmpty && link.isEmpty) {
+      toast(context, 'El enlace no es válido. Ejemplo: https://youtube.com');
+      return;
+    }
     setState(() => _busy = true);
     try {
       var image = '';
@@ -52,8 +61,15 @@ class _CreateScreenState extends State<CreateScreen> {
           image = url;
         }
       }
-      await Db.createPost(text, image, videoUrl: video);
+      await Db.createPost(
+        text,
+        image,
+        videoUrl: video,
+        linkUrl: link,
+        groupId: widget.groupId,
+      );
       _text.clear();
+      _link.clear();
       if (mounted) {
         setState(() => _media = null);
         toast(context, 'Publicado');
@@ -108,7 +124,9 @@ class _CreateScreenState extends State<CreateScreen> {
   Widget build(BuildContext context) {
     final m = _media;
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva publicación')),
+      appBar: AppBar(
+        title: Text(widget.groupId.isEmpty ? 'Nueva publicación' : 'Publicar en el grupo'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -119,6 +137,16 @@ class _CreateScreenState extends State<CreateScreen> {
             minLines: 4,
             decoration: const InputDecoration(
               hintText: '¿Qué está pasando en tu partida?',
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _link,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'Enlace (opcional)',
+              hintText: 'https://…',
+              prefixIcon: Icon(Icons.link),
             ),
           ),
           const SizedBox(height: 12),

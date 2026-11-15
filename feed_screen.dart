@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/db.dart';
 import '../widgets/post_card.dart';
+import 'search_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -41,6 +42,16 @@ class _FeedScreenState extends State<FeedScreen> {
             'GamingSocial',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Buscar jugadores',
+              icon: const Icon(Icons.search),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SearchScreen()),
+              ),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [Tab(text: 'Para ti'), Tab(text: 'Siguiendo')],
           ),
@@ -62,7 +73,9 @@ class _FeedScreenState extends State<FeedScreen> {
                   valueListenable: Session.i.following,
                   builder: (context, following, _) {
                     final visible = all
-                        .where((d) => !blocked.contains(d.data()['authorId']))
+                        .where((d) =>
+                            !blocked.contains(d.data()['authorId']) &&
+                            ((d.data()['groupId'] ?? '') as String).isEmpty)
                         .toList();
                     final fromFollowed = visible.where((d) {
                       final a = d.data()['authorId'];

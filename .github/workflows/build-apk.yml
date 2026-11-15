@@ -16,7 +16,7 @@ jobs:
         run: |
           mkdir -p lib/screens lib/services lib/widgets
           move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
-          for f in admin_screen auth_screen banned_screen create_screen feed_screen home_shell profile_screen profile_setup_screen search_screen; do move "$f.dart" lib/screens; done
+          for f in admin_screen auth_screen banned_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
           for f in comments_sheet post_card report_dialog user_avatar; do move "$f.dart" lib/widgets; done
           for f in main firebase_options theme util; do move "$f.dart" lib; done
@@ -56,6 +56,17 @@ jobs:
           sed -i 's#android:label="[^"]*"#android:label="GamingSocial"#' "$M"
 
       - run: flutter pub get
+
+      # Ícono de la app: usa app_icon.png (en la raíz del repo) si existe.
+      - name: App icon
+        run: |
+          if [ -f app_icon.png ]; then
+            flutter pub add --dev flutter_launcher_icons
+            printf 'flutter_launcher_icons:\n  android: true\n  ios: false\n  image_path: "app_icon.png"\n  min_sdk_android: 23\n' > flutter_launcher_icons.yaml
+            dart run flutter_launcher_icons
+          else
+            echo "No hay app_icon.png, se usa el ícono por defecto"
+          fi
 
       - name: Build release APK
         run: flutter build apk --release

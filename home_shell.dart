@@ -4,8 +4,9 @@ import '../services/db.dart';
 import 'admin_screen.dart';
 import 'create_screen.dart';
 import 'feed_screen.dart';
+import 'groups_screen.dart';
 import 'profile_screen.dart';
-import 'search_screen.dart';
+import 'reels_screen.dart';
 
 class _Dest {
   final String label;
@@ -48,13 +49,19 @@ class _HomeShellState extends State<HomeShell> {
       builder: (context, admin, _) {
         final dests = <_Dest>[
           const _Dest('Inicio', Icons.home_outlined, Icons.home, FeedScreen()),
-          const _Dest('Buscar', Icons.search, Icons.search, SearchScreen()),
+          _Dest(
+            'Reels',
+            Icons.play_circle_outline,
+            Icons.play_circle,
+            ReelsScreen(active: _index == 1),
+          ),
           _Dest(
             'Crear',
             Icons.add_circle_outline,
             Icons.add_circle,
             CreateScreen(onDone: () => setState(() => _index = 0)),
           ),
+          const _Dest('Grupos', Icons.groups_outlined, Icons.groups, GroupsScreen()),
           _Dest(
             'Perfil',
             Icons.person_outline,

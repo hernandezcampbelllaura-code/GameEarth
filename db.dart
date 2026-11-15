@@ -25,6 +25,7 @@ class Db {
   static CollectionReference<Json> get posts => fs.collection('posts');
   static CollectionReference<Json> get reports => fs.collection('reports');
   static CollectionReference<Json> get usernames => fs.collection('usernames');
+  static CollectionReference<Json> get groups => fs.collection('groups');
 
   // ---------- Publicaciones ----------
 
@@ -32,6 +33,8 @@ class Db {
     String text,
     String imageUrl, {
     String videoUrl = '',
+    String linkUrl = '',
+    String groupId = '',
   }) {
     return posts.add({
       'authorId': myUid,
@@ -39,6 +42,8 @@ class Db {
       'text': text,
       'imageUrl': imageUrl,
       'videoUrl': videoUrl,
+      'linkUrl': linkUrl,
+      'groupId': groupId,
       'createdAt': FieldValue.serverTimestamp(),
       'likesCount': 0,
       'commentsCount': 0,
@@ -79,6 +84,55 @@ class Db {
     b.delete(p.collection('comments').doc(commentId));
     b.update(p, {'commentsCount': FieldValue.increment(-1)});
     return b.commit();
+  }
+
+  // ---------- Grupos ----------
+
+  static Future<void> createGroup(String name, String description) {
+    final g = groups.doc();
+    final b = fs.batch();
+    b.set(g, {
+      'name': name,
+      'description': description,
+      'ownerId': myUid,
+      'ownerName': Session.i.username,
+      'membersCount': 1,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    b.set(g.collection('members').doc(myUid),
+        {'createdAt': FieldValue.serverTimestamp()});
+    return b.commit();
+  }
+
+  static Future<void> joinGroup(String groupId) {
+    final g = groups.doc(groupId);
+    final b = fs.batch();
+    b.set(g.collection('members').doc(myUid),
+        {'createdAt': FieldValue.serverTimestamp()});
+    b.update(g, {'membersCount': FieldValue.increment(1)});
+    return b.commit();
+  }
+
+  static Future<void> leaveGroup(String groupId) {
+    final g = groups.doc(groupId);
+    final b = fs.batch();
+    b.delete(g.collection('members').doc(myUid));
+    b.update(g, {'membersCount': FieldValue.increment(-1)});
+    return b.commit();
+  }
+
+  /// Borra el grupo y sus publicaciones (dueño o admin).
+  static Future<void> deleteGroup(String groupId) async {
+    final mine = await posts.where('groupId', isEqualTo: groupId).get();
+    final docs = mine.docs;
+    for (var i = 0; i < docs.length; i += 400) {
+      final b = fs.batch();
+      for (final d in docs.skip(i).take(400)) {
+        b.delete(d.reference);
+      }
+      await b.commit();
+    }
+    await groups.doc(groupId).delete();
   }
 
   // ---------- Seguir / bloquear ----------

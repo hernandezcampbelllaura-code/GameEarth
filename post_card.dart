@@ -63,6 +63,7 @@ class PostCard extends StatelessWidget {
     final text = (d['text'] ?? '') as String;
     final img = (d['imageUrl'] ?? '') as String;
     final video = (d['videoUrl'] ?? '') as String;
+    final link = (d['linkUrl'] ?? '') as String;
     final likes = ((d['likesCount'] ?? 0) as num).toInt();
     final comments = ((d['commentsCount'] ?? 0) as num).toInt();
     final mine = authorId == myUid;
@@ -163,6 +164,40 @@ class PostCard extends StatelessWidget {
                 child: _VideoBox(url: video),
               ),
             ),
+          if (link.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10, right: 6),
+              child: InkWell(
+                onTap: () => openLink(context, link),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white24),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          link,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           Row(
             children: [
               StreamBuilder<DocumentSnapshot<Json>>(
@@ -194,6 +229,20 @@ class PostCard extends StatelessWidget {
                 label: Text(
                   '$comments',
                   style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => sharePost(
+                  author: author,
+                  text: text,
+                  imageUrl: img,
+                  videoUrl: video,
+                  linkUrl: link,
+                ),
+                icon: const Icon(Icons.share_outlined, color: Colors.white70),
+                label: const Text(
+                  'Compartir',
+                  style: TextStyle(color: Colors.white70),
                 ),
               ),
             ],
