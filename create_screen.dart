@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -101,11 +100,19 @@ class _CreateScreenState extends State<CreateScreen> {
                     ],
                   ),
                 )
-              : Image.file(
-                  File(m.path),
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
+              : FutureBuilder<Uint8List>(
+                  future: m.bytes,
+                  builder: (context, snap) => snap.hasData
+                      ? Image.memory(
+                          snap.data!,
+                          height: 220,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        )
+                      : const SizedBox(
+                          height: 220,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
                 ),
         ),
         Positioned(

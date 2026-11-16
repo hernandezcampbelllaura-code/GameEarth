@@ -1,0 +1,74 @@
+name: Build Web (iPhone, Windows, Mac, Linux)
+
+# Se ejecuta a mano: pestaña Actions > "Build Web" > Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Arrange files
+        run: |
+          mkdir -p lib/screens lib/services lib/widgets
+          move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
+          for f in admin_screen auth_screen banned_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
+          move db.dart lib/services
+          for f in comments_sheet post_card report_dialog user_avatar; do move "$f.dart" lib/widgets; done
+          for f in main firebase_options theme util; do move "$f.dart" lib; done
+          test -f lib/main.dart || { echo "Falta main.dart"; exit 1; }
+          if grep -q "PEGA_AQUI" <(sed -n '/static const FirebaseOptions web/,/);/p' lib/firebase_options.dart); then
+            echo "Falta pegar la configuración web en firebase_options.dart"; exit 1
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate web project
+        run: |
+          cp -r lib "$RUNNER_TEMP/lib_bak"
+          cp pubspec.yaml "$RUNNER_TEMP/pubspec_bak.yaml"
+          flutter create --platforms=web --org com.gamingsocial --project-name gamingsocial .
+          rm -rf lib test
+          cp -r "$RUNNER_TEMP/lib_bak" lib
+          cp "$RUNNER_TEMP/pubspec_bak.yaml" pubspec.yaml
+          sed -i 's#<title>[^<]*</title>#<title>GamingSocial</title>#' web/index.html
+          if [ -f app_icon.png ] && command -v convert >/dev/null; then
+            convert app_icon.png -resize 192x192 web/icons/Icon-192.png
+            convert app_icon.png -resize 512x512 web/icons/Icon-512.png
+            convert app_icon.png -resize 192x192 web/icons/Icon-maskable-192.png
+            convert app_icon.png -resize 512x512 web/icons/Icon-maskable-512.png
+            convert app_icon.png -resize 64x64 web/favicon.png
+          fi
+
+      - run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

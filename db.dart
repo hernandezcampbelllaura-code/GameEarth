@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -303,9 +302,14 @@ class MediaException implements Exception {
 
 /// Un archivo elegido de la galería, todavía sin subir.
 class PickedMedia {
-  final String path;
+  final XFile file;
   final bool isVideo;
-  const PickedMedia(this.path, this.isVideo);
+  PickedMedia(this.file, this.isVideo);
+
+  String get path => file.path;
+
+  /// Bytes del archivo (sirve en Android, iPhone y web). Se leen una sola vez.
+  late final Future<Uint8List> bytes = file.readAsBytes();
 }
 
 /// Elegir fotos y videos de la galería del teléfono y subirlos a Cloudinary.
@@ -323,19 +327,19 @@ class Media {
       maxWidth: maxWidth,
       imageQuality: 80,
     );
-    return f == null ? null : PickedMedia(f.path, false);
+    return f == null ? null : PickedMedia(f, false);
   }
 
   static Future<PickedMedia?> pickVideo() async {
     final f = await _picker.pickVideo(source: ImageSource.gallery);
     if (f == null) return null;
-    final size = await File(f.path).length();
+    final size = await f.length();
     if (size > _maxVideoBytes) {
       throw const MediaException(
         'El video pesa más de 90 MB. Elige uno más corto.',
       );
     }
-    return PickedMedia(f.path, true);
+    return PickedMedia(f, true);
   }
 
   /// Sube el archivo y devuelve su dirección https.
@@ -351,7 +355,14 @@ class Media {
     );
     final req = http.MultipartRequest('POST', uri)
       ..fields['upload_preset'] = MediaConfig.uploadPreset
-      ..files.add(await http.MultipartFile.fromPath('file', m.path));
+      ..files.add(
+        http.MultipartFile(
+          'file',
+          m.file.openRead(),
+          await m.file.length(),
+          filename: m.file.name,
+        ),
+      );
 
     final streamed = await req.send().timeout(const Duration(minutes: 6));
     final res = await http.Response.fromStream(streamed);

@@ -9,6 +9,17 @@ class AppFirebaseOptions {
     projectId: 'gamingsocial-f47ba',
     storageBucket: 'gamingsocial-f47ba.firebasestorage.app',
   );
+
+  /// Versión web (iPhone por Safari, computadoras). Copia estos valores de
+  /// Firebase > Configuración del proyecto > Tus apps > Web.
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'PEGA_AQUI',
+    appId: 'PEGA_AQUI',
+    messagingSenderId: '779220140558',
+    projectId: 'gamingsocial-f47ba',
+    authDomain: 'gamingsocial-f47ba.firebaseapp.com',
+    storageBucket: 'gamingsocial-f47ba.firebasestorage.app',
+  );
 }
 
 /// Datos de Cloudinary: el almacén gratuito donde se guardan las fotos y los
