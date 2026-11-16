@@ -13,8 +13,8 @@ class AppFirebaseOptions {
   /// Versión web (iPhone por Safari, computadoras). Copia estos valores de
   /// Firebase > Configuración del proyecto > Tus apps > Web.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'PEGA_AQUI',
-    appId: 'PEGA_AQUI',
+    apiKey: 'AIzaSyBA6_XUQA0lfqVN9OuJ6M5ewLeRK4K25ek',
+    appId: '1:779220140558:web:77546b8fc1b9caa807f25f',
     messagingSenderId: '779220140558',
     projectId: 'gamingsocial-f47ba',
     authDomain: 'gamingsocial-f47ba.firebaseapp.com',
