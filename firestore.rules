@@ -53,8 +53,12 @@ service cloud.firestore {
     // Un contador solo puede subir o bajar de 1 en 1.
     function step(field) {
       return !(field in request.resource.data.diff(resource.data).affectedKeys())
-        || (request.resource.data[field] - resource.data[field] >= -1
-            && request.resource.data[field] - resource.data[field] <= 1);
+        || (request.resource.data[field] - resource.data.get(field, 0) >= -1
+            && request.resource.data[field] - resource.data.get(field, 0) <= 1);
+    }
+
+    function okReaction(t) {
+      return t in ['love', 'like', 'sad', 'angry', 'wow', 'confused'];
     }
 
     match /admins/{uid} {
@@ -138,13 +142,17 @@ service cloud.firestore {
       allow create: if canWrite()
         && request.resource.data.keys().hasOnly([
              'authorId', 'authorName', 'text', 'imageUrl', 'videoUrl',
-             'linkUrl', 'groupId', 'createdAt', 'likesCount', 'commentsCount'])
+             'linkUrl', 'groupId', 'description', 'views', 'createdAt',
+             'likesCount', 'commentsCount'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName == myProfile().username
         && okText(request.resource.data.text, 500)
         && okMedia(request.resource.data.imageUrl)
         && okMedia(request.resource.data.videoUrl)
         && okLink(request.resource.data.linkUrl)
+        && request.resource.data.description is string
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.views == 0
         && okGroup(request.resource.data.groupId)
         && request.resource.data.createdAt == request.time
         && request.resource.data.likesCount == 0
@@ -154,19 +162,33 @@ service cloud.firestore {
       // el admin puede todo.
       allow update: if (canWrite()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['likesCount', 'commentsCount'])
+               .hasOnly(['likesCount', 'commentsCount', 'views'])
           && step('likesCount')
-          && step('commentsCount'))
+          && step('commentsCount')
+          && step('views'))
         || isAdmin();
 
       allow delete: if isAdmin()
         || (canWrite() && resource.data.authorId == request.auth.uid);
 
+      // Reacciones: 'type' es love, like, sad, angry, wow o confused.
       match /likes/{uid} {
         allow read: if signedIn();
         allow create: if canWrite() && request.auth.uid == uid
-          && request.resource.data.keys().hasOnly(['createdAt']);
+          && request.resource.data.keys().hasOnly(['createdAt', 'type'])
+          && okReaction(request.resource.data.type);
+        allow update: if canWrite() && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['type'])
+          && okReaction(request.resource.data.type);
         allow delete: if canWrite() && request.auth.uid == uid;
+      }
+
+      // Visitas: una por persona. Solo se pueden crear, nunca cambiar.
+      match /views/{uid} {
+        allow read: if signedIn();
+        allow create: if canWrite() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['createdAt']);
       }
 
       match /comments/{commentId} {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -5,6 +7,8 @@ import 'package:video_player/video_player.dart';
 import '../services/db.dart';
 import '../util.dart';
 import '../widgets/comments_sheet.dart';
+import '../widgets/reactions.dart';
+import '../widgets/report_dialog.dart';
 import '../widgets/user_avatar.dart';
 import 'profile_screen.dart';
 
@@ -87,11 +91,26 @@ class _ReelPageState extends State<_ReelPage> {
   VideoPlayerController? _c;
   bool _failed = false;
   bool _starting = false;
+  Timer? _viewTimer;
+
+  /// Cuenta una visita si el reel se queda en pantalla un par de segundos.
+  void _watchForView() {
+    _viewTimer?.cancel();
+    final id = widget.doc.id;
+    final author = (widget.doc.data()?['authorId'] ?? '') as String;
+    _viewTimer = Timer(
+      const Duration(seconds: 2),
+      () => Db.registerView(id, author),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.active) _start();
+    if (widget.active) {
+      _watchForView();
+      _start();
+    }
   }
 
   @override
@@ -99,12 +118,14 @@ class _ReelPageState extends State<_ReelPage> {
     super.didUpdateWidget(old);
     if (widget.active == old.active) return;
     if (widget.active) {
+      _watchForView();
       if (_c == null) {
         _start();
       } else {
         _c!.play();
       }
     } else {
+      _viewTimer?.cancel();
       _c?.pause();
       _c?.seekTo(Duration.zero);
     }
@@ -133,6 +154,7 @@ class _ReelPageState extends State<_ReelPage> {
 
   @override
   void dispose() {
+    _viewTimer?.cancel();
     _c?.dispose();
     super.dispose();
   }
@@ -189,6 +211,37 @@ class _ReelPageState extends State<_ReelPage> {
               ),
             ),
           ),
+        // Tres puntitos arriba a la derecha
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 6,
+          right: 6,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.black38,
+              shape: BoxShape.circle,
+            ),
+            child: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onSelected: (v) {
+                if (v == 'info') {
+                  _showInfo(context, widget.doc);
+                } else if (v == 'report') {
+                  showReportDialog(
+                    context,
+                    type: 'post',
+                    targetId: widget.doc.id,
+                    ownerId: authorId,
+                    preview: text,
+                  );
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'info', child: Text('Ver información')),
+                PopupMenuItem(value: 'report', child: Text('Denunciar')),
+              ],
+            ),
+          ),
+        ),
         // Texto abajo a la izquierda
         Positioned(
           left: 14,
@@ -253,23 +306,15 @@ class _ReelPageState extends State<_ReelPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              StreamBuilder<DocumentSnapshot<Json>>(
-                stream: widget.doc.reference
-                    .collection('likes')
-                    .doc(myUid)
-                    .snapshots(),
-                builder: (context, s) {
-                  final liked = s.data?.exists ?? false;
-                  return _Action(
-                    icon: liked ? Icons.favorite : Icons.favorite_border,
-                    color: liked ? Colors.pinkAccent : Colors.white,
-                    label: '$likes',
-                    onTap: () => guard(
-                      context,
-                      () => Db.setLike(widget.doc.id, !liked),
-                    ),
-                  );
-                },
+              ReactionBuilder(
+                postId: widget.doc.id,
+                builder: (context, mine, onTap, onLongPress) => _Action(
+                  icon: Icons.favorite_border,
+                  emoji: mine == null ? null : reactionEmoji(mine),
+                  label: '$likes',
+                  onTap: onTap,
+                  onLongPress: onLongPress,
+                ),
               ),
               _Action(
                 icon: Icons.mode_comment_outlined,
@@ -296,13 +341,17 @@ class _ReelPageState extends State<_ReelPage> {
 
 class _Action extends StatelessWidget {
   final IconData icon;
+  final String? emoji;
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   const _Action({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.emoji,
+    this.onLongPress,
     this.color = Colors.white,
   });
 
@@ -312,17 +361,114 @@ class _Action extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(30),
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: Column(
             children: [
-              Icon(icon, size: 32, color: color),
+              emoji != null
+                  ? Text(emoji!, style: const TextStyle(fontSize: 30))
+                  : Icon(icon, size: 32, color: color),
               const SizedBox(height: 2),
               Text(label, style: const TextStyle(fontSize: 12)),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+String _dateTime(dynamic ts) {
+  if (ts is! Timestamp) return '-';
+  final d = ts.toDate();
+  final hh = d.hour.toString().padLeft(2, '0');
+  final mi = d.minute.toString().padLeft(2, '0');
+  return '${formatFullDate(ts)}  $hh:$mi';
+}
+
+/// Información del reel: descripción, fecha, visitas, me gusta y reacciones.
+Future<void> _showInfo(BuildContext context, DocumentSnapshot<Json> doc) {
+  final d = doc.data() ?? <String, dynamic>{};
+  final desc = ((d['description'] ?? '') as String).trim();
+  final text = ((d['text'] ?? '') as String).trim();
+  final views = ((d['views'] ?? 0) as num).toInt();
+  final likes = ((d['likesCount'] ?? 0) as num).toInt();
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Información del reel',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 14),
+            const Text('Descripción', style: TextStyle(color: Colors.white60)),
+            const SizedBox(height: 4),
+            Text(desc.isNotEmpty ? desc : (text.isNotEmpty ? text : 'Sin descripción')),
+            const SizedBox(height: 16),
+            _InfoRow(Icons.event, 'Fecha', _dateTime(d['createdAt'])),
+            _InfoRow(Icons.visibility_outlined, 'Visitas', '$views'),
+            _InfoRow(Icons.favorite_border, 'Me gusta y reacciones', '$likes'),
+            const SizedBox(height: 8),
+            FutureBuilder<Map<String, int>>(
+              future: Db.reactionCounts(doc.id),
+              builder: (context, snap) {
+                if (!snap.hasData) {
+                  return const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: LinearProgressIndicator(),
+                  );
+                }
+                final m = snap.data!;
+                if (m.isEmpty) {
+                  return const Text(
+                    'Aún no hay reacciones.',
+                    style: TextStyle(color: Colors.white60),
+                  );
+                }
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final r in kReactions)
+                      if ((m[r[0]] ?? 0) > 0)
+                        Chip(label: Text('${r[1]}  ${m[r[0]]}')),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow(this.icon, this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.white70),
+          const SizedBox(width: 10),
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }

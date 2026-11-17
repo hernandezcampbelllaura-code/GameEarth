@@ -34,6 +34,7 @@ class Db {
     String videoUrl = '',
     String linkUrl = '',
     String groupId = '',
+    String description = '',
   }) {
     return posts.add({
       'authorId': myUid,
@@ -43,6 +44,8 @@ class Db {
       'videoUrl': videoUrl,
       'linkUrl': linkUrl,
       'groupId': groupId,
+      'description': description,
+      'views': 0,
       'createdAt': FieldValue.serverTimestamp(),
       'likesCount': 0,
       'commentsCount': 0,
@@ -61,6 +64,57 @@ class Db {
       b.update(p, {'likesCount': FieldValue.increment(-1)});
     }
     return b.commit();
+  }
+
+  /// Reacciona a una publicación. Si ya tenías esa misma reacción, la quita;
+  /// si tenías otra, la cambia (el contador total no cambia).
+  static Future<void> react(String postId, String type) async {
+    final p = posts.doc(postId);
+    final l = p.collection('likes').doc(myUid);
+    final snap = await l.get();
+    final cur = snap.exists ? ((snap.data()?['type'] ?? 'love') as String) : null;
+    if (cur == null) {
+      final b = fs.batch();
+      b.set(l, {'createdAt': FieldValue.serverTimestamp(), 'type': type});
+      b.update(p, {'likesCount': FieldValue.increment(1)});
+      await b.commit();
+    } else if (cur == type) {
+      final b = fs.batch();
+      b.delete(l);
+      b.update(p, {'likesCount': FieldValue.increment(-1)});
+      await b.commit();
+    } else {
+      await l.update({'type': type});
+    }
+  }
+
+  /// Cuenta cuántas reacciones hay de cada tipo.
+  static Future<Map<String, int>> reactionCounts(String postId) async {
+    final q = await posts.doc(postId).collection('likes').limit(1000).get();
+    final out = <String, int>{};
+    for (final d in q.docs) {
+      final t = (d.data()['type'] ?? 'love') as String;
+      out[t] = (out[t] ?? 0) + 1;
+    }
+    return out;
+  }
+
+  static final Set<String> _seenViews = {};
+
+  /// Suma una visita (una sola por persona). No cuenta las del propio autor.
+  static Future<void> registerView(String postId, String authorId) async {
+    if (authorId == myUid || !_seenViews.add(postId)) return;
+    try {
+      final p = posts.doc(postId);
+      final v = p.collection('views').doc(myUid);
+      if ((await v.get()).exists) return;
+      final b = fs.batch();
+      b.set(v, {'createdAt': FieldValue.serverTimestamp()});
+      b.update(p, {'views': FieldValue.increment(1)});
+      await b.commit();
+    } catch (_) {
+      // Una visita que falla no debe molestar a nadie.
+    }
   }
 
   static Future<void> addComment(String postId, String text) {

@@ -16,6 +16,7 @@ class CreateScreen extends StatefulWidget {
 class _CreateScreenState extends State<CreateScreen> {
   final _text = TextEditingController();
   final _link = TextEditingController();
+  final _desc = TextEditingController();
   PickedMedia? _media;
   bool _busy = false;
 
@@ -23,6 +24,7 @@ class _CreateScreenState extends State<CreateScreen> {
   void dispose() {
     _text.dispose();
     _link.dispose();
+    _desc.dispose();
     super.dispose();
   }
 
@@ -66,9 +68,11 @@ class _CreateScreenState extends State<CreateScreen> {
         videoUrl: video,
         linkUrl: link,
         groupId: widget.groupId,
+        description: _desc.text.trim(),
       );
       _text.clear();
       _link.clear();
+      _desc.clear();
       if (mounted) {
         setState(() => _media = null);
         toast(context, 'Publicado');
@@ -147,6 +151,16 @@ class _CreateScreenState extends State<CreateScreen> {
             ),
           ),
           const SizedBox(height: 4),
+          TextField(
+            controller: _desc,
+            maxLength: 500,
+            maxLines: 3,
+            minLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Descripción (opcional, se ve en Reels)',
+              prefixIcon: Icon(Icons.notes),
+            ),
+          ),
           TextField(
             controller: _link,
             keyboardType: TextInputType.url,

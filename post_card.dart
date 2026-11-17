@@ -6,6 +6,7 @@ import '../screens/profile_screen.dart';
 import '../services/db.dart';
 import '../util.dart';
 import 'comments_sheet.dart';
+import 'reactions.dart';
 import 'report_dialog.dart';
 import 'user_avatar.dart';
 
@@ -200,25 +201,38 @@ class PostCard extends StatelessWidget {
             ),
           Row(
             children: [
-              StreamBuilder<DocumentSnapshot<Json>>(
-                stream: doc.reference.collection('likes').doc(myUid).snapshots(),
-                builder: (context, s) {
-                  final liked = s.data?.exists ?? false;
-                  return TextButton.icon(
-                    onPressed: () => guard(
-                      context,
-                      () => Db.setLike(doc.id, !liked),
+              ReactionBuilder(
+                postId: doc.id,
+                builder: (context, mine, onTap, onLongPress) => InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: onTap,
+                  onLongPress: onLongPress,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    icon: Icon(
-                      liked ? Icons.favorite : Icons.favorite_border,
-                      color: liked ? Colors.pinkAccent : Colors.white70,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        mine == null
+                            ? const Icon(
+                                Icons.favorite_border,
+                                color: Colors.white70,
+                              )
+                            : Text(
+                                reactionEmoji(mine),
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$likes',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
                     ),
-                    label: Text(
-                      '$likes',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  );
-                },
+                  ),
+                ),
               ),
               TextButton.icon(
                 onPressed: () => showCommentsSheet(context, doc.id),
