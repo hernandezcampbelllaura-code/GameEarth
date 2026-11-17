@@ -18,7 +18,7 @@ jobs:
           move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
           for f in admin_screen auth_screen banned_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
-          for f in comments_sheet poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
+          for f in comments_sheet feedback_prompt poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
           for f in main firebase_options theme util; do move "$f.dart" lib; done
           test -f lib/main.dart || { echo "Falta main.dart"; exit 1; }
           test -f pubspec.yaml || { echo "Falta pubspec.yaml"; exit 1; }

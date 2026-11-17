@@ -114,6 +114,42 @@ class Db {
     return b.commit();
   }
 
+  /// Guarda la opinión (estrellas + motivo) y, si está configurado, la manda
+  /// también al correo por medio de Formspree.
+  static Future<void> sendFeedback(int stars, String reason) async {
+    final name = Session.i.username;
+    await fs.collection('feedback').add({
+      'userId': myUid,
+      'username': name,
+      'stars': stars,
+      'reason': reason,
+      'platform': kIsWeb ? 'web' : 'android',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    final url = FeedbackConfig.emailFormUrl;
+    if (url.isEmpty) return;
+    try {
+      await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              '_subject': 'GamingSocial: $stars/5 de @$name',
+              'estrellas': '$stars de 5',
+              'usuario': '@$name',
+              'motivo': reason,
+              'plataforma': kIsWeb ? 'web' : 'android',
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {
+      // Si el correo falla, la opinión ya quedó guardada en Firestore.
+    }
+  }
+
   static final Set<String> _seenViews = {};
 
   /// Suma una visita (una sola por persona). No cuenta las del propio autor.
@@ -333,6 +369,7 @@ class Session {
   void start(String uid) {
     stop();
     final me = Db.users.doc(uid);
+    _moveEmailToPrivate(uid);
     _subs.add(me.snapshots().listen(
           (s) => username = (s.data()?['username'] as String?) ?? username,
           onError: (_) {},
@@ -349,6 +386,28 @@ class Session {
           (s) => isAdmin.value = s.exists,
           onError: (_) => isAdmin.value = false,
         ));
+  }
+
+  /// Los correos ya no se guardan en el perfil público: se pasan a
+  /// userPrivate/<uid>, que solo puedes leer tú y el admin.
+  Future<void> _moveEmailToPrivate(String uid) async {
+    try {
+      final me = Db.users.doc(uid);
+      final snap = await me.get();
+      final data = snap.data();
+      if (data == null || !data.containsKey('email')) return;
+      final email = (data['email'] ?? '') as String;
+      final priv = fs.collection('userPrivate').doc(uid);
+      if (!(await priv.get()).exists && email.isNotEmpty) {
+        await priv.set({
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await me.update({'email': FieldValue.delete()});
+    } catch (_) {
+      // Si falla, se intentará de nuevo la próxima vez que abra la app.
+    }
   }
 
   void stop() {

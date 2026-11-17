@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
 import 'admin_screen.dart';
 import 'create_screen.dart';
 import 'feed_screen.dart';
+import '../widgets/feedback_prompt.dart';
 import 'groups_screen.dart';
 import 'profile_screen.dart';
 import 'reels_screen.dart';
@@ -29,15 +32,28 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  Timer? _ratingTimer;
+  bool _asking = false;
 
   @override
   void initState() {
     super.initState();
     Session.i.start(widget.uid);
+    // Cada 30 minutos de uso se le pide a la persona calificar la app.
+    _ratingTimer = Timer.periodic(const Duration(minutes: 30), (_) async {
+      if (!mounted || _asking) return;
+      _asking = true;
+      try {
+        await showRatingDialog(context);
+      } finally {
+        _asking = false;
+      }
+    });
   }
 
   @override
   void dispose() {
+    _ratingTimer?.cancel();
     Session.i.stop();
     super.dispose();
   }

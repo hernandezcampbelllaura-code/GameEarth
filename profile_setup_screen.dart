@@ -48,10 +48,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         final existing = await tx.get(nameRef);
         if (existing.exists) throw Exception('taken');
         tx.set(nameRef, {'uid': myUid});
+        tx.set(fs.collection('userPrivate').doc(myUid), {
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
         tx.set(userRef, {
           'username': name,
           'usernameLower': lower,
-          'email': email,
           'bio': '',
           'photoUrl': '',
           'favoriteGames': <String>[],

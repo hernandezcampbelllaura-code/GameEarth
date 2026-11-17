@@ -20,6 +20,11 @@ class _AdminScreenState extends State<AdminScreen> {
       Db.users.orderBy('createdAt', descending: true).limit(200).snapshots();
   late final Stream<QuerySnapshot<Json>> _posts =
       Db.posts.orderBy('createdAt', descending: true).limit(100).snapshots();
+  late final Stream<QuerySnapshot<Json>> _feedback = fs
+      .collection('feedback')
+      .orderBy('createdAt', descending: true)
+      .limit(100)
+      .snapshots();
   late final Stream<QuerySnapshot<Json>> _reports =
       Db.reports.orderBy('createdAt', descending: true).limit(100).snapshots();
 
@@ -132,8 +137,16 @@ class _AdminScreenState extends State<AdminScreen> {
                         if (deleted) _chip('ELIMINADO', Colors.redAccent),
                       ],
                     ),
-                    subtitle: Text(
-                      '${u['email'] ?? ''}\nRegistro: ${formatFullDate(u['createdAt'])}',
+                    subtitle: FutureBuilder<DocumentSnapshot<Json>>(
+                      future: fs.collection('userPrivate').doc(d.id).get(),
+                      builder: (context, es) {
+                        final email = (es.data?.data()?['email'] ??
+                                u['email'] ??
+                                '') as String;
+                        return Text(
+                          '$email\nRegistro: ${formatFullDate(u['createdAt'])}',
+                        );
+                      },
                     ),
                     trailing: PopupMenuButton<String>(
                       onSelected: (v) => _userAction(v, d),
@@ -258,6 +271,58 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Widget _feedbackTab() {
+    return StreamBuilder<QuerySnapshot<Json>>(
+      stream: _feedback,
+      builder: (context, snap) {
+        if (!snap.hasData) return _states(snap);
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('Aún no hay opiniones.'));
+        }
+        final avg = docs
+                .map((d) => ((d.data()['stars'] ?? 0) as num).toDouble())
+                .fold<double>(0, (a, b) => a + b) /
+            docs.length;
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Promedio: ${avg.toStringAsFixed(1)} ★  ·  ${docs.length} opiniones',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                itemCount: docs.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final f = docs[i].data();
+                  final stars = ((f['stars'] ?? 0) as num).toInt();
+                  return ListTile(
+                    isThreeLine: true,
+                    title: Text(
+                      '${'★' * stars}${'☆' * (5 - stars)}   @${f['username'] ?? ''}',
+                      style: const TextStyle(color: Colors.amber),
+                    ),
+                    subtitle: Text(
+                      '${f['reason'] ?? ''}\n'
+                      '${formatFullDate(f['createdAt'])} · ${f['platform'] ?? ''}',
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _reportsTab() {
     return StreamBuilder<QuerySnapshot<Json>>(
       stream: _reports,
@@ -315,7 +380,7 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Row(
@@ -330,11 +395,12 @@ class _AdminScreenState extends State<AdminScreen> {
               Tab(text: 'Usuarios'),
               Tab(text: 'Publicaciones'),
               Tab(text: 'Denuncias'),
+              Tab(text: 'Opiniones'),
             ],
           ),
         ),
         body: TabBarView(
-          children: [_usersTab(), _postsTab(), _reportsTab()],
+          children: [_usersTab(), _postsTab(), _reportsTab(), _feedbackTab()],
         ),
       ),
     );

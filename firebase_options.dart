@@ -32,3 +32,10 @@ class MediaConfig {
       !cloudName.startsWith('PEGA_AQUI') &&
       !uploadPreset.startsWith('PEGA_AQUI');
 }
+
+/// Opiniones (estrellas): siempre se guardan en Firestore y las ves en el panel
+/// de Admin. Si pegas aquí el enlace de un formulario de Formspree
+/// (https://formspree.io/f/xxxxxxxx), cada opinión además llega a tu Gmail.
+class FeedbackConfig {
+  static const String emailFormUrl = '';
+}
