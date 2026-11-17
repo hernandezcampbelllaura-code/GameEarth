@@ -17,6 +17,11 @@ class _CreateScreenState extends State<CreateScreen> {
   final _text = TextEditingController();
   final _link = TextEditingController();
   final _desc = TextEditingController();
+  bool _poll = false;
+  final List<TextEditingController> _opts = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
   PickedMedia? _media;
   bool _busy = false;
 
@@ -25,6 +30,9 @@ class _CreateScreenState extends State<CreateScreen> {
     _text.dispose();
     _link.dispose();
     _desc.dispose();
+    for (final o in _opts) {
+      o.dispose();
+    }
     super.dispose();
   }
 
@@ -49,6 +57,13 @@ class _CreateScreenState extends State<CreateScreen> {
       toast(context, 'El enlace no es válido. Ejemplo: https://youtube.com');
       return;
     }
+    final options = _poll
+        ? _opts.map((o) => o.text.trim()).where((o) => o.isNotEmpty).toList()
+        : <String>[];
+    if (_poll && options.length < 2) {
+      toast(context, 'La votación necesita al menos 2 opciones.');
+      return;
+    }
     setState(() => _busy = true);
     try {
       var image = '';
@@ -69,10 +84,15 @@ class _CreateScreenState extends State<CreateScreen> {
         linkUrl: link,
         groupId: widget.groupId,
         description: _desc.text.trim(),
+        pollOptions: options,
       );
       _text.clear();
       _link.clear();
       _desc.clear();
+      for (final o in _opts) {
+        o.clear();
+      }
+      _poll = false;
       if (mounted) {
         setState(() => _media = null);
         toast(context, 'Publicado');
@@ -170,6 +190,54 @@ class _CreateScreenState extends State<CreateScreen> {
               prefixIcon: Icon(Icons.link),
             ),
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Agregar votación'),
+            subtitle: const Text('La gente vota y ve el porcentaje de cada opción'),
+            value: _poll,
+            onChanged: _busy ? null : (v) => setState(() => _poll = v),
+          ),
+          if (_poll) ...[
+            for (var i = 0; i < _opts.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _opts[i],
+                        maxLength: 60,
+                        decoration: InputDecoration(
+                          labelText: 'Opción ${i + 1}',
+                          counterText: '',
+                        ),
+                      ),
+                    ),
+                    if (_opts.length > 2)
+                      IconButton(
+                        tooltip: 'Quitar opción',
+                        icon: const Icon(Icons.close),
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() => _opts.removeAt(i).dispose()),
+                      ),
+                  ],
+                ),
+              ),
+            if (_opts.length < 4)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : () => setState(
+                            () => _opts.add(TextEditingController()),
+                          ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Agregar opción'),
+                ),
+              ),
+          ],
           const SizedBox(height: 12),
           if (m != null) ...[
             _preview(m),

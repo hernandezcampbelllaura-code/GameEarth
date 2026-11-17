@@ -35,6 +35,7 @@ class Db {
     String linkUrl = '',
     String groupId = '',
     String description = '',
+    List<String> pollOptions = const [],
   }) {
     return posts.add({
       'authorId': myUid,
@@ -45,6 +46,8 @@ class Db {
       'linkUrl': linkUrl,
       'groupId': groupId,
       'description': description,
+      'pollOptions': pollOptions,
+      'pollCounts': {for (var i = 0; i < pollOptions.length; i++) '$i': 0},
       'views': 0,
       'createdAt': FieldValue.serverTimestamp(),
       'likesCount': 0,
@@ -97,6 +100,18 @@ class Db {
       out[t] = (out[t] ?? 0) + 1;
     }
     return out;
+  }
+
+  /// Vota en la encuesta de una publicación (un voto por persona).
+  static Future<void> vote(String postId, int option) {
+    final p = posts.doc(postId);
+    final b = fs.batch();
+    b.set(p.collection('votes').doc(myUid), {
+      'option': option,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    b.update(p, {'pollCounts.$option': FieldValue.increment(1)});
+    return b.commit();
   }
 
   static final Set<String> _seenViews = {};

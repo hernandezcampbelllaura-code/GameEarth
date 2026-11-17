@@ -6,6 +6,7 @@ import '../screens/profile_screen.dart';
 import '../services/db.dart';
 import '../util.dart';
 import 'comments_sheet.dart';
+import 'poll_block.dart';
 import 'reactions.dart';
 import 'report_dialog.dart';
 import 'user_avatar.dart';
@@ -165,6 +166,7 @@ class PostCard extends StatelessWidget {
                 child: _VideoBox(url: video),
               ),
             ),
+          PollBlock(doc: doc),
           if (link.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 10, right: 6),

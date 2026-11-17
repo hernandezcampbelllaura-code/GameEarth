@@ -57,6 +57,34 @@ service cloud.firestore {
             && request.resource.data[field] - resource.data.get(field, 0) <= 1);
     }
 
+    function pollTotal(m) {
+      return m.get('0', 0) + m.get('1', 0) + m.get('2', 0) + m.get('3', 0);
+    }
+
+    // Votar: cambia una sola opción, suma exactamente 1 y deja el voto
+    // registrado (posts/<id>/votes/<uid>), que no existía antes.
+    function okVote(postId) {
+      return request.resource.data.pollCounts.diff(resource.data.pollCounts)
+               .affectedKeys().size() == 1
+        && pollTotal(request.resource.data.pollCounts)
+             - pollTotal(resource.data.pollCounts) == 1
+        && !exists(/databases/$(database)/documents/posts/$(postId)/votes/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/posts/$(postId)/votes/$(request.auth.uid));
+    }
+
+    // Encuesta opcional: 0 opciones, o de 2 a 4 de hasta 60 letras.
+    function okPoll(opts, counts) {
+      return opts is list && counts is map
+        && counts.keys().size() == opts.size()
+        && pollTotal(counts) == 0
+        && (opts.size() == 0
+            || (opts.size() >= 2 && opts.size() <= 4
+                && opts[0] is string && opts[0].size() <= 60
+                && opts[1] is string && opts[1].size() <= 60
+                && (opts.size() < 3 || (opts[2] is string && opts[2].size() <= 60))
+                && (opts.size() < 4 || (opts[3] is string && opts[3].size() <= 60))));
+    }
+
     function okReaction(t) {
       return t in ['love', 'like', 'sad', 'angry', 'wow', 'confused'];
     }
@@ -142,7 +170,8 @@ service cloud.firestore {
       allow create: if canWrite()
         && request.resource.data.keys().hasOnly([
              'authorId', 'authorName', 'text', 'imageUrl', 'videoUrl',
-             'linkUrl', 'groupId', 'description', 'views', 'createdAt',
+             'linkUrl', 'groupId', 'description', 'views', 'pollOptions',
+             'pollCounts', 'createdAt',
              'likesCount', 'commentsCount'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName == myProfile().username
@@ -153,6 +182,7 @@ service cloud.firestore {
         && request.resource.data.description is string
         && request.resource.data.description.size() <= 500
         && request.resource.data.views == 0
+        && okPoll(request.resource.data.pollOptions, request.resource.data.pollCounts)
         && okGroup(request.resource.data.groupId)
         && request.resource.data.createdAt == request.time
         && request.resource.data.likesCount == 0
@@ -162,10 +192,12 @@ service cloud.firestore {
       // el admin puede todo.
       allow update: if (canWrite()
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['likesCount', 'commentsCount', 'views'])
+               .hasOnly(['likesCount', 'commentsCount', 'views', 'pollCounts'])
           && step('likesCount')
           && step('commentsCount')
-          && step('views'))
+          && step('views')
+          && (!('pollCounts' in request.resource.data.diff(resource.data).affectedKeys())
+              || okVote(postId)))
         || isAdmin();
 
       allow delete: if isAdmin()
@@ -182,6 +214,18 @@ service cloud.firestore {
                .hasOnly(['type'])
           && okReaction(request.resource.data.type);
         allow delete: if canWrite() && request.auth.uid == uid;
+      }
+
+      // Votos de la encuesta: uno por persona, no se pueden cambiar.
+      match /votes/{uid} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        allow create: if canWrite() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['option', 'createdAt'])
+          && request.resource.data.option is int
+          && request.resource.data.option >= 0
+          && request.resource.data.option
+               < get(/databases/$(database)/documents/posts/$(postId)).data.pollOptions.size()
+          && request.resource.data.createdAt == request.time;
       }
 
       // Visitas: una por persona. Solo se pueden crear, nunca cambiar.
