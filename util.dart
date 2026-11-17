@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -106,4 +107,51 @@ Future<void> sharePost({
     if (linkUrl.isNotEmpty) linkUrl,
   ];
   await Share.share(parts.join('\n'));
+}
+
+/// Correo de contacto: lo ve cualquier persona que use la app.
+const String kContactEmail = 'hernandezcampbelllaura@gmail.com';
+
+/// Ventana "¿No estás de acuerdo con algo?" con el correo para escribir.
+Future<void> showContactDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Contacto'),
+      content: const Text(
+        '¿No estás de acuerdo con una decisión, una suspensión o algo de la '
+        'app? Escríbenos y lo revisamos.\n\n$kContactEmail',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            await Clipboard.setData(const ClipboardData(text: kContactEmail));
+            if (ctx.mounted) {
+              Navigator.pop(ctx);
+              toast(context, 'Correo copiado');
+            }
+          },
+          child: const Text('Copiar correo'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final uri = Uri(
+              scheme: 'mailto',
+              path: kContactEmail,
+              queryParameters: {'subject': 'GamingSocial - Contacto'},
+            );
+            try {
+              final ok =
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+              if (!ok && ctx.mounted) toast(ctx, 'No se pudo abrir el correo');
+            } catch (_) {
+              if (ctx.mounted) toast(ctx, 'No se pudo abrir el correo');
+            }
+            if (ctx.mounted) Navigator.pop(ctx);
+          },
+          child: const Text('Escribir correo'),
+        ),
+      ],
+    ),
+  );
 }

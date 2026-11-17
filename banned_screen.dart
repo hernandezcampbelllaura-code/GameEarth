@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../util.dart';
+
 class BannedScreen extends StatelessWidget {
   const BannedScreen({super.key});
 
@@ -25,6 +27,12 @@ class BannedScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => showContactDialog(context),
+                icon: const Icon(Icons.mail_outline),
+                label: const Text('¿No estás de acuerdo? Escríbenos'),
+              ),
+              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
                 child: const Text('Cerrar sesión'),

@@ -204,6 +204,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: Text(widget.isMe ? 'Mi perfil' : 'Perfil'),
         actions: [
+          IconButton(
+            tooltip: 'Contacto',
+            onPressed: () => showContactDialog(context),
+            icon: const Icon(Icons.mail_outline),
+          ),
           if (widget.isMe)
             IconButton(
               tooltip: 'Cerrar sesión',

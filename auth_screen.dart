@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../util.dart';
+
 /// Sube este número cuando cambies los términos.
 const int kTermsVersion = 1;
 
@@ -226,6 +228,10 @@ class _AuthScreenState extends State<AuthScreen> {
                       onPressed: _reset,
                       child: const Text('Olvidé mi contraseña'),
                     ),
+                  TextButton(
+                    onPressed: () => showContactDialog(context),
+                    child: const Text('¿No estás de acuerdo con algo? Escríbenos'),
+                  ),
                 ],
               ),
             ),
@@ -308,6 +314,12 @@ class TermsScreen extends StatelessWidget {
             Text(s[1], style: const TextStyle(height: 1.4)),
             const SizedBox(height: 18),
           ],
+          Center(
+            child: TextButton(
+              onPressed: () => showContactDialog(context),
+              child: const Text('¿No estás de acuerdo? Escríbenos'),
+            ),
+          ),
           Center(
             child: FilledButton(
               onPressed: () => Navigator.of(context).pop(),
