@@ -37,7 +37,8 @@ class Db {
     String description = '',
     List<String> pollOptions = const [],
   }) {
-    return posts.add({
+    final b = fs.batch();
+    b.set(posts.doc(), {
       'authorId': myUid,
       'authorName': Session.i.username,
       'text': text,
@@ -53,6 +54,9 @@ class Db {
       'likesCount': 0,
       'commentsCount': 0,
     });
+    // Freno anti-bots: el servidor exige separar cada acción unos segundos.
+    b.update(users.doc(myUid), {'lastActionAt': FieldValue.serverTimestamp()});
+    return b.commit();
   }
 
   static Future<void> setLike(String postId, bool like) {
@@ -168,7 +172,12 @@ class Db {
     }
   }
 
-  static Future<void> addComment(String postId, String text) {
+  static Future<void> addComment(
+    String postId,
+    String text, {
+    String parentId = '',
+    String replyToName = '',
+  }) {
     final p = posts.doc(postId);
     final c = p.collection('comments').doc();
     final b = fs.batch();
@@ -176,9 +185,12 @@ class Db {
       'authorId': myUid,
       'authorName': Session.i.username,
       'text': text,
+      'parentId': parentId,
+      'replyToName': replyToName,
       'createdAt': FieldValue.serverTimestamp(),
     });
     b.update(p, {'commentsCount': FieldValue.increment(1)});
+    b.update(users.doc(myUid), {'lastActionAt': FieldValue.serverTimestamp()});
     return b.commit();
   }
 
@@ -188,6 +200,45 @@ class Db {
     b.delete(p.collection('comments').doc(commentId));
     b.update(p, {'commentsCount': FieldValue.increment(-1)});
     return b.commit();
+  }
+
+  // ---------- Chats privados ----------
+
+  static CollectionReference<Json> get chats => fs.collection('chats');
+
+  static String chatId(String a, String b) {
+    final ids = [a, b]..sort();
+    return ids.join('_');
+  }
+
+  static Future<void> sendMessage(
+    String otherUid,
+    String otherName,
+    String text,
+  ) async {
+    final ids = [myUid, otherUid]..sort();
+    final ref = chats.doc(ids.join('_'));
+    final snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        'members': ids,
+        'names': {myUid: Session.i.username, otherUid: otherName},
+        'lastMessage': '',
+        'lastAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    final b = fs.batch();
+    b.set(ref.collection('messages').doc(), {
+      'senderId': myUid,
+      'text': text,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    b.update(ref, {
+      'lastMessage': text.length > 100 ? text.substring(0, 100) : text,
+      'lastAt': FieldValue.serverTimestamp(),
+    });
+    await b.commit();
   }
 
   // ---------- Grupos ----------
@@ -505,6 +556,15 @@ class Media {
       final msg = err is Map ? err['message'] : null;
       throw MediaException(
         'No se pudo subir el archivo: ${msg ?? 'código ${res.statusCode}'}',
+      );
+    }
+    // Si Cloudinary tiene activada la moderación con IA, rechaza lo indebido.
+    final mod = body['moderation'];
+    if (mod is List &&
+        mod.any((e) => e is Map && e['status'] == 'rejected')) {
+      throw const MediaException(
+        'Este archivo fue rechazado automáticamente por contener contenido '
+        'no permitido (sexual o violento).',
       );
     }
     final url = body['secure_url'];

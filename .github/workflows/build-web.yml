@@ -23,10 +23,10 @@ jobs:
         run: |
           mkdir -p lib/screens lib/services lib/widgets
           move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
-          for f in admin_screen auth_screen banned_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
+          for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
           for f in comments_sheet feedback_prompt poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
-          for f in main firebase_options theme util; do move "$f.dart" lib; done
+          for f in main firebase_options net safety theme util; do move "$f.dart" lib; done
           test -f lib/main.dart || { echo "Falta main.dart"; exit 1; }
           if grep -q "PEGA_AQUI" <(sed -n '/static const FirebaseOptions web/,/);/p' lib/firebase_options.dart); then
             echo "Falta pegar la configuración web en firebase_options.dart"; exit 1
@@ -54,10 +54,45 @@ jobs:
             convert app_icon.png -resize 64x64 web/favicon.png
           fi
 
+      # Pantalla de inicio instantánea (se ve mientras carga la app).
+      - name: Splash screen
+        run: |
+          python3 - <<'PY'
+          p = 'web/index.html'
+          s = open(p, encoding='utf-8').read()
+          css = ('<style>html,body{margin:0;background:#0B0F1A}'
+                 '#splash{position:fixed;inset:0;z-index:0;display:flex;flex-direction:column;'
+                 'align-items:center;justify-content:center;color:#fff;'
+                 'font-family:Arial,sans-serif}'
+                 '#splash b{font-size:26px;margin-top:14px}'
+                 '#splash i{margin-top:18px;width:34px;height:34px;border:4px solid #3a3f55;'
+                 'border-top-color:#7C4DFF;border-radius:50%;animation:s 1s linear infinite}'
+                 '@keyframes s{to{transform:rotate(360deg)}}</style>')
+          splash = ('<div id="splash"><img src="icons/Icon-192.png" width="96" height="96" alt="">'
+                    '<b>GamingSocial</b><i></i></div>')
+          s = s.replace('</head>', css + '</head>', 1)
+          s = s.replace('<body>', '<body>' + splash, 1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+
+      # Letra Roboto incluida en la app (así no depende de descargarla de Google).
+      - name: Bundle Roboto font
+        run: |
+          FR="$(dirname "$(dirname "$(readlink -f "$(which flutter)")")")"
+          F="$FR/bin/cache/artifacts/material_fonts"
+          if [ -f "$F/Roboto-Regular.ttf" ] && [ -f "$F/Roboto-Bold.ttf" ]; then
+            mkdir -p fonts
+            cp "$F/Roboto-Regular.ttf" "$F/Roboto-Bold.ttf" fonts/
+            printf '  fonts:\n    - family: Roboto\n      fonts:\n        - asset: fonts/Roboto-Regular.ttf\n        - asset: fonts/Roboto-Bold.ttf\n          weight: 700\n' >> pubspec.yaml
+            echo "Roboto incluida"
+          else
+            echo "No se encontró Roboto en el SDK; se usa la descarga normal"
+          fi
+
       - run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+        run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
 
       - uses: actions/upload-pages-artifact@v3
         with:

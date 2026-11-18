@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../net.dart';
+import '../safety.dart';
 import '../services/db.dart';
 import '../util.dart';
 import 'report_dialog.dart';
@@ -26,6 +28,8 @@ class _CommentsSheet extends StatefulWidget {
 class _CommentsSheetState extends State<_CommentsSheet> {
   final _ctrl = TextEditingController();
   bool _sending = false;
+  String _replyParent = '';
+  String _replyName = '';
 
   late final Stream<QuerySnapshot<Json>> _stream = Db.posts
       .doc(widget.postId)
@@ -42,10 +46,28 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   Future<void> _send() async {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
+    if (!await requireOnline(context, 'comentar')) return;
+    if (!mounted || !Safety.check(context, [t])) return;
+    final w = RateLimit.wait('comment', 6);
+    if (w > 0) {
+      toast(context, 'Espera $w s antes de comentar otra vez.');
+      return;
+    }
     setState(() => _sending = true);
     try {
-      await Db.addComment(widget.postId, t);
+      await Db.addComment(
+        widget.postId,
+        t,
+        parentId: _replyParent,
+        replyToName: _replyName,
+      );
       _ctrl.clear();
+      if (mounted) {
+        setState(() {
+          _replyParent = '';
+          _replyName = '';
+        });
+      }
     } catch (e) {
       if (mounted) toast(context, 'No se pudo comentar: $e');
     } finally {
@@ -103,53 +125,116 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                   return ValueListenableBuilder<Set<String>>(
                     valueListenable: Session.i.blocked,
                     builder: (context, blocked, _) {
-                      final docs = snap.data!.docs
+                      final all = snap.data!.docs
                           .where((d) => !blocked.contains(d.data()['authorId']))
                           .toList();
-                      if (docs.isEmpty) {
+                      if (all.isEmpty) {
                         return const Center(
                           child: Text('Sé el primero en comentar.'),
                         );
                       }
+                      // Comentarios principales y, debajo de cada uno, sus respuestas.
+                      final ids = {for (final d in all) d.id};
+                      String parentOf(QueryDocumentSnapshot<Json> d) =>
+                          ((d.data()['parentId'] ?? '') as String);
+                      final roots = all
+                          .where((d) =>
+                              parentOf(d).isEmpty || !ids.contains(parentOf(d)))
+                          .toList();
+                      final rows =
+                          <MapEntry<QueryDocumentSnapshot<Json>, bool>>[];
+                      for (final r in roots) {
+                        rows.add(MapEntry(r, false));
+                        for (final x in all) {
+                          if (parentOf(x) == r.id) rows.add(MapEntry(x, true));
+                        }
+                      }
+                      final docs = rows;
                       return ListView.builder(
                         itemCount: docs.length,
                         itemBuilder: (_, i) {
-                          final d = docs[i];
+                          final d = docs[i].key;
+                          final isReply = docs[i].value;
                           final c = d.data();
                           final authorId = (c['authorId'] ?? '') as String;
                           final text = (c['text'] ?? '') as String;
                           final mine = authorId == myUid;
                           final canDelete = mine || Session.i.isAdmin.value;
-                          return ListTile(
-                            leading: UserAvatar(uid: authorId, radius: 16),
-                            title: Text(
-                              '@${c['authorName'] ?? 'usuario'} · ${formatDate(c['createdAt'])}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white60,
+                          final replyTo = (c['replyToName'] ?? '') as String;
+                          return Padding(
+                            padding: EdgeInsets.only(left: isReply ? 40 : 0),
+                            child: ListTile(
+                              leading: UserAvatar(
+                                uid: authorId,
+                                radius: isReply ? 13 : 16,
                               ),
-                            ),
-                            subtitle: Text(
-                              text,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
+                              title: Text(
+                                '@${c['authorName'] ?? 'usuario'} · ${formatDate(c['createdAt'])}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white60,
+                                ),
                               ),
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (v) => _menu(v, d.id, authorId, text),
-                              itemBuilder: (_) => [
-                                if (!mine)
-                                  const PopupMenuItem(
-                                    value: 'report',
-                                    child: Text('Denunciar'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        if (isReply && replyTo.isNotEmpty)
+                                          TextSpan(
+                                            text: '@$replyTo ',
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                            ),
+                                          ),
+                                        TextSpan(text: text),
+                                      ],
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                    ),
                                   ),
-                                if (canDelete)
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Eliminar'),
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      _replyParent =
+                                          isReply ? parentOf(d) : d.id;
+                                      _replyName =
+                                          (c['authorName'] ?? '') as String;
+                                    }),
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'Responder',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                              ],
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (v) =>
+                                    _menu(v, d.id, authorId, text),
+                                itemBuilder: (_) => [
+                                  if (!mine)
+                                    const PopupMenuItem(
+                                      value: 'report',
+                                      child: Text('Denunciar'),
+                                    ),
+                                  if (canDelete)
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Text('Eliminar'),
+                                    ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -159,6 +244,31 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                 },
               ),
             ),
+            if (_replyName.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Respondiendo a @$_replyName',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => setState(() {
+                        _replyParent = '';
+                        _replyName = '';
+                      }),
+                    ),
+                  ],
+                ),
+              ),
             SafeArea(
               top: false,
               child: Padding(
@@ -172,7 +282,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         maxLines: 1,
                         onSubmitted: (_) => _send(),
                         decoration: const InputDecoration(
-                          hintText: 'Escribe un comentario…',
+                          hintText: _replyName.isEmpty
+                              ? 'Escribe un comentario…'
+                              : 'Escribe tu respuesta…',
                           counterText: '',
                         ),
                       ),

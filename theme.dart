@@ -10,6 +10,7 @@ ThemeData buildTheme() {
   );
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Roboto',
     colorScheme: scheme,
     scaffoldBackgroundColor: bg,
     appBarTheme: const AppBarTheme(

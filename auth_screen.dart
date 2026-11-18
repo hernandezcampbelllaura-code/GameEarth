@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+
+import '../net.dart';
+import '../safety.dart';
 
 import '../util.dart';
 
@@ -25,15 +29,29 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _busy = false;
   bool _accepted = false;
   String? _error;
+  final _human = TextEditingController();
+  HumanCheck _check = HumanCheck();
+  int _fails = 0;
+  DateTime? _lockUntil;
 
   @override
   void dispose() {
     _email.dispose();
     _pass.dispose();
+    _human.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    final lock = _lockUntil;
+    if (lock != null && DateTime.now().isBefore(lock)) {
+      final s = lock.difference(DateTime.now()).inSeconds + 1;
+      setState(() => _error = 'Demasiados intentos. Espera $s segundos.');
+      return;
+    }
+    if (!await requireOnline(context, _register ? 'crear tu cuenta' : 'iniciar sesión')) {
+      return;
+    }
     if (_register) {
       if (!_accepted) {
         setState(() => _error =
@@ -42,6 +60,14 @@ class _AuthScreenState extends State<AuthScreen> {
       }
       if (_pass.text.length < 8) {
         setState(() => _error = 'La contraseña debe tener al menos 8 caracteres.');
+        return;
+      }
+      if (!_check.ok(_human.text)) {
+        setState(() {
+          _error = 'La respuesta de la suma no es correcta.';
+          _check = HumanCheck();
+          _human.clear();
+        });
         return;
       }
     }
@@ -65,10 +91,74 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on FirebaseAuthException catch (e) {
       TermsState.accepted = false;
-      setState(() => _error = _message(e.code, e.message));
+      var msg = _message(e.code, e.message);
+      if (!_register &&
+          (e.code == 'user-not-found' || e.code == 'invalid-credential')) {
+        msg = await _loginFailMessage(msg);
+        _fails++;
+        if (_fails >= 5) {
+          _fails = 0;
+          _lockUntil = DateTime.now().add(const Duration(seconds: 30));
+          msg = 'Demasiados intentos fallidos. Espera 30 segundos.';
+        }
+      }
+      if (mounted) setState(() => _error = msg);
     } catch (e) {
       TermsState.accepted = false;
-      setState(() => _error = 'Error: $e');
+      if (mounted) setState(() => _error = 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Distingue "no existe la cuenta" de "contraseña incorrecta". Para que
+  /// funcione, en Firebase debe estar desactivada la "Protección de
+  /// enumeración de correos".
+  Future<String> _loginFailMessage(String fallback) async {
+    try {
+      // ignore: deprecated_member_use
+      final methods = await FirebaseAuth.instance
+          .fetchSignInMethodsForEmail(_email.text.trim());
+      if (methods.isEmpty) {
+        return 'No existe ninguna cuenta con ese correo en la app. '
+            'Toca "Regístrate" para crear una.';
+      }
+      if (!methods.contains('password') && methods.contains('google.com')) {
+        return 'Ese correo se registró con Google. '
+            'Usa el botón "Continuar con Google".';
+      }
+      return 'Contraseña incorrecta.';
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  Future<void> _google() async {
+    if (!await requireOnline(context, 'entrar con Google')) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final provider = GoogleAuthProvider()
+        ..addScope('email')
+        ..addScope('profile');
+      if (kIsWeb) {
+        await FirebaseAuth.instance.signInWithPopup(provider);
+      } else {
+        await FirebaseAuth.instance.signInWithProvider(provider);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'popup-closed-by-user' &&
+          e.code != 'cancelled-popup-request' &&
+          e.code != 'canceled' &&
+          mounted) {
+        setState(() => _error = e.code == 'operation-not-allowed'
+            ? 'El acceso con Google aún no está activado en Firebase.'
+            : _message(e.code, e.message));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'No se pudo entrar con Google: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -189,6 +279,16 @@ class _AuthScreenState extends State<AuthScreen> {
                       ],
                     ),
                   ],
+                  if (_register) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _human,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'No soy un robot: ${_check.question}',
+                      ),
+                    ),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     Text(
@@ -210,6 +310,21 @@ class _AuthScreenState extends State<AuthScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(_register ? 'Crear cuenta' : 'Iniciar sesión'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _google,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      label: const Text('Continuar con Google'),
                     ),
                   ),
                   TextButton(

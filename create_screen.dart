@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../net.dart';
+import '../safety.dart';
 import '../services/db.dart';
 import '../util.dart';
 
@@ -62,6 +64,16 @@ class _CreateScreenState extends State<CreateScreen> {
         : <String>[];
     if (_poll && options.length < 2) {
       toast(context, 'La votación necesita al menos 2 opciones.');
+      return;
+    }
+    if (!await requireOnline(context, 'publicar')) return;
+    if (!mounted) return;
+    if (!Safety.check(context, [text, _desc.text, ...options, _link.text])) {
+      return;
+    }
+    final w = RateLimit.wait('post', 15);
+    if (w > 0) {
+      toast(context, 'Espera $w s antes de publicar otra vez.');
       return;
     }
     setState(() => _busy = true);

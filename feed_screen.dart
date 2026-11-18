@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../net.dart';
 import '../services/db.dart';
 import '../widgets/post_card.dart';
+import 'chats_screen.dart';
 import 'search_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -35,12 +37,18 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'GamingSocial',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'GamingSocial',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              ConnectionDot(),
+            ],
           ),
           actions: [
             IconButton(
@@ -53,7 +61,7 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           ],
           bottom: const TabBar(
-            tabs: [Tab(text: 'Para ti'), Tab(text: 'Siguiendo')],
+            tabs: [Tab(text: 'Para ti'), Tab(text: 'Siguiendo'), Tab(text: 'Chats')],
           ),
         ),
         body: StreamBuilder<QuerySnapshot<Json>>(
@@ -88,6 +96,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           fromFollowed,
                           'Aquí verás lo que publiquen las personas que sigues.\nUsa Buscar para encontrar jugadores.',
                         ),
+                        const ChatsTab(),
                       ],
                     );
                   },

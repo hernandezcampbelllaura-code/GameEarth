@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../net.dart';
+import '../safety.dart';
 import '../services/db.dart';
 import 'auth_screen.dart';
 
@@ -19,6 +21,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Si entró con Google, se rellena el nombre de usuario con su nombre.
+    final u = FirebaseAuth.instance.currentUser;
+    var base = (u?.displayName ?? '').replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
+    if (base.isEmpty) {
+      base = (u?.email ?? '').split('@').first.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
+    }
+    if (base.length > 20) base = base.substring(0, 20);
+    if (base.length >= 3) _name.text = base;
+  }
+
+  @override
   void dispose() {
     _name.dispose();
     super.dispose();
@@ -34,6 +49,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       setState(() => _error = 'Debes aceptar los Términos y Condiciones.');
       return;
     }
+    if (Safety.isBad(name)) {
+      setState(() => _error = 'Ese nombre no está permitido.');
+      return;
+    }
+    if (!await requireOnline(context, 'guardar tu perfil')) return;
     setState(() {
       _busy = true;
       _error = null;

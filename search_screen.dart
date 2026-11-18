@@ -8,7 +8,9 @@ import '../widgets/user_avatar.dart';
 import 'profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  /// Si es true, al tocar a alguien se devuelve [uid, nombre] (para chats).
+  final bool pick;
+  const SearchScreen({super.key, this.pick = false});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -71,7 +73,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Buscar jugadores')),
+      appBar: AppBar(
+        title: Text(widget.pick ? 'Elige con quién chatear' : 'Buscar jugadores'),
+      ),
       body: Column(
         children: [
           Padding(
@@ -120,15 +124,25 @@ class _SearchScreenState extends State<SearchScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileScreen(
-                            uid: d.id,
-                            isMe: d.id == myUid,
+                      onTap: () {
+                        if (widget.pick) {
+                          if (d.id == myUid) return;
+                          Navigator.pop(
+                            context,
+                            <String>[d.id, (u['username'] ?? '') as String],
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProfileScreen(
+                              uid: d.id,
+                              isMe: d.id == myUid,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 );

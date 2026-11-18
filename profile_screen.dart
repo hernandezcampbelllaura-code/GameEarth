@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
+import 'chats_screen.dart';
 import '../util.dart';
 import '../widgets/post_card.dart';
 import '../widgets/report_dialog.dart';
@@ -320,6 +321,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           );
                                   },
                                 ),
+                              if (!isBlocked) ...[
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ChatScreen(
+                                        otherUid: widget.uid,
+                                        otherName: name,
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                  label: const Text('Mensaje'),
+                                ),
+                              ],
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_horiz),
                                 onSelected: (v) => _other(v, name),
