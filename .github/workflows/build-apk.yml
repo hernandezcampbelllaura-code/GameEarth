@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -75,3 +78,12 @@ jobs:
         with:
           name: GamingSocial-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      # Enlace de descarga directo (más fácil que el zip de Artifacts).
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk GamingSocial.apk
+          gh release delete apk-latest --yes --cleanup-tag || true
+          gh release create apk-latest GamingSocial.apk --title "GamingSocial (APK más reciente)" --notes "Descarga GamingSocial.apk e instálala." 
