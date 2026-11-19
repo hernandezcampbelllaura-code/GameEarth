@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -14,8 +13,8 @@ class GroupsScreen extends StatefulWidget {
 }
 
 class _GroupsScreenState extends State<GroupsScreen> {
-  late final Stream<QuerySnapshot<Json>> _stream =
-      Db.groups.orderBy('createdAt', descending: true).limit(100).snapshots();
+  late final Stream<Snap> _stream =
+      Db.watchGroups();
 
   Future<void> _create() async {
     final name = TextEditingController();
@@ -89,7 +88,7 @@ class _GroupsScreenState extends State<GroupsScreen> {
         icon: const Icon(Icons.group_add),
         label: const Text('Crear grupo'),
       ),
-      body: StreamBuilder<QuerySnapshot<Json>>(
+      body: StreamBuilder<Snap>(
         stream: _stream,
         builder: (context, snap) {
           if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));

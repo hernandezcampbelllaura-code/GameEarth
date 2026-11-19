@@ -1,30 +1,261 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../firebase_options.dart';
+import '../config.dart';
 
 typedef Json = Map<String, dynamic>;
 
-FirebaseFirestore get fs => FirebaseFirestore.instance;
+SupabaseClient get sb => Supabase.instance.client;
 
 /// UID del usuario con sesión iniciada.
-String get myUid => FirebaseAuth.instance.currentUser!.uid;
+String get myUid => sb.auth.currentUser!.id;
 
-/// Acceso a Firestore y todas las acciones de la app.
+/// Un registro de la base de datos (con las claves en camelCase).
+class Doc {
+  final String id;
+  final Json _data;
+  final bool exists;
+  const Doc(this.id, this._data, {this.exists = true});
+  Json data() => _data;
+}
+
+/// Lista de registros.
+class Snap {
+  final List<Doc> docs;
+  const Snap(this.docs);
+}
+
+String _camelKey(String k) {
+  final p = k.split('_');
+  final b = StringBuffer(p.first);
+  for (final s in p.skip(1)) {
+    if (s.isEmpty) continue;
+    b.write(s[0].toUpperCase());
+    b.write(s.substring(1));
+  }
+  return b.toString();
+}
+
+Doc _toDoc(Json row, String Function(Json)? idOf) {
+  final out = <String, dynamic>{};
+  row.forEach((k, v) {
+    final key = _camelKey(k);
+    if (v is String && key.endsWith('At')) {
+      out[key] = DateTime.tryParse(v)?.toLocal() ?? v;
+    } else {
+      out[key] = v;
+    }
+  });
+  if (row.containsKey('user_a') && row.containsKey('user_b')) {
+    out['members'] = [row['user_a'], row['user_b']];
+  }
+  if (row.containsKey('option_index')) out['option'] = row['option_index'];
+  final id = idOf != null ? idOf(row) : (row['id'] ?? '').toString();
+  return Doc(id, out);
+}
+
+int _watchCounter = 0;
+
+/// Convierte una consulta en un flujo que se actualiza solo: escucha los
+/// cambios en tiempo real y además revisa cada 20 segundos por si la conexión
+/// en tiempo real está bloqueada.
+Stream<Snap> watchQuery(
+  String table,
+  Future<List<dynamic>> Function() load, {
+  String Function(Json)? id,
+  String? filterColumn,
+  Object? filterValue,
+}) {
+  late final StreamController<Snap> c;
+  RealtimeChannel? ch;
+  Timer? deb;
+  Timer? poll;
+  var closed = true;
+
+  Future<void> run() async {
+    try {
+      final rows = await load();
+      if (closed) return;
+      c.add(Snap([
+        for (final r in rows) _toDoc(Map<String, dynamic>.from(r as Map), id),
+      ]));
+    } catch (e) {
+      if (!closed) c.addError(e);
+    }
+  }
+
+  c = StreamController<Snap>.broadcast(
+    onListen: () {
+      closed = false;
+      run();
+      try {
+        ch = sb
+            .channel('w${_watchCounter++}')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: table,
+              filter: filterColumn == null
+                  ? null
+                  : PostgresChangeFilter(
+                      type: PostgresChangeFilterType.eq,
+                      column: filterColumn,
+                      value: filterValue!,
+                    ),
+              callback: (_) {
+                deb?.cancel();
+                deb = Timer(const Duration(milliseconds: 250), run);
+              },
+            )
+            .subscribe();
+      } catch (_) {}
+      poll = Timer.periodic(const Duration(seconds: 20), (_) => run());
+    },
+    onCancel: () {
+      closed = true;
+      deb?.cancel();
+      poll?.cancel();
+      final x = ch;
+      ch = null;
+      if (x != null) {
+        try {
+          sb.removeChannel(x);
+        } catch (_) {}
+      }
+    },
+  );
+  return c.stream;
+}
+
+/// Acceso a la base de datos y todas las acciones de la app.
 class Db {
   Db._();
 
-  static CollectionReference<Json> get users => fs.collection('users');
-  static CollectionReference<Json> get posts => fs.collection('posts');
-  static CollectionReference<Json> get reports => fs.collection('reports');
-  static CollectionReference<Json> get usernames => fs.collection('usernames');
-  static CollectionReference<Json> get groups => fs.collection('groups');
+  // ---------- Lecturas en vivo ----------
+
+  static Stream<Snap> watchPosts({String? authorId, String? groupId, int limit = 100}) {
+    return watchQuery('posts', () {
+      var q = sb.from('posts').select();
+      if (authorId != null) q = q.eq('author_id', authorId);
+      if (groupId != null) q = q.eq('group_id', groupId);
+      return q.order('created_at', ascending: false).limit(limit);
+    });
+  }
+
+  static Stream<Doc> watchProfile(String uid) {
+    return watchQuery(
+      'profiles',
+      () => sb.from('profiles').select().eq('id', uid),
+      filterColumn: 'id',
+      filterValue: uid,
+    ).map((s) => s.docs.isEmpty ? Doc(uid, const {}, exists: false) : s.docs.first);
+  }
+
+  static Stream<Snap> watchUsers() => watchQuery('profiles',
+      () => sb.from('profiles').select().order('created_at', ascending: false).limit(200));
+
+  static Stream<Snap> watchFeedback() => watchQuery('feedback',
+      () => sb.from('feedback').select().order('created_at', ascending: false).limit(100));
+
+  static Stream<Snap> watchReports() => watchQuery('reports',
+      () => sb.from('reports').select().order('created_at', ascending: false).limit(100));
+
+  static Stream<Snap> watchGroups() => watchQuery('groups',
+      () => sb.from('groups').select().order('created_at', ascending: false).limit(100));
+
+  static Stream<Doc> watchGroup(String id) {
+    return watchQuery(
+      'groups',
+      () => sb.from('groups').select().eq('id', id),
+      filterColumn: 'id',
+      filterValue: id,
+    ).map((s) => s.docs.isEmpty ? Doc(id, const {}, exists: false) : s.docs.first);
+  }
+
+  static Stream<Doc> watchMembership(String groupId) {
+    return watchQuery(
+      'group_members',
+      () => sb.from('group_members').select().eq('group_id', groupId).eq('user_id', myUid),
+      filterColumn: 'group_id',
+      filterValue: groupId,
+      id: (r) => r['user_id'].toString(),
+    ).map((s) => s.docs.isEmpty ? Doc(myUid, const {}, exists: false) : s.docs.first);
+  }
+
+  static Stream<Snap> watchComments(String postId) => watchQuery(
+        'comments',
+        () => sb.from('comments').select().eq('post_id', postId).order('created_at'),
+        filterColumn: 'post_id',
+        filterValue: postId,
+      );
+
+  static Stream<Snap> watchChats() => watchQuery('chats', () {
+        final me = myUid;
+        return sb
+            .from('chats')
+            .select()
+            .or('user_a.eq.$me,user_b.eq.$me')
+            .order('last_at', ascending: false);
+      });
+
+  static Stream<Snap> watchMessages(String chatId) => watchQuery(
+        'messages',
+        () => sb
+            .from('messages')
+            .select()
+            .eq('chat_id', chatId)
+            .order('created_at', ascending: false)
+            .limit(100),
+        filterColumn: 'chat_id',
+        filterValue: chatId,
+      );
+
+  static Stream<int> watchFollowCount(String uid, {required bool followers}) {
+    final col = followers ? 'following_id' : 'follower_id';
+    return watchQuery(
+      'follows',
+      () => sb.from('follows').select().eq(col, uid),
+      id: (r) => '${r['follower_id']}_${r['following_id']}',
+    ).map((s) => s.docs.length);
+  }
+
+  static Future<List<Doc>> searchUsers(String q) async {
+    final safe = q.replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    final rows = await sb
+        .from('profiles')
+        .select()
+        .ilike('username_lower', '$safe%')
+        .eq('deleted', false)
+        .limit(25);
+    return [for (final r in rows) _toDoc(Map<String, dynamic>.from(r), null)];
+  }
+
+  // Perfiles en memoria (para las fotos de perfil sin abrir mil conexiones).
+  static final Map<String, Future<Json?>> _profiles = {};
+
+  static Future<Json?> profileOf(String uid) {
+    return _profiles.putIfAbsent(uid, () async {
+      try {
+        final r = await sb.from('profiles').select().eq('id', uid).maybeSingle();
+        return r == null ? null : _toDoc(Map<String, dynamic>.from(r), null).data();
+      } catch (_) {
+        _profiles.remove(uid);
+        return null;
+      }
+    });
+  }
+
+  static void forgetProfile(String uid) => _profiles.remove(uid);
+
+  static Future<String> userEmail(String uid) async {
+    final r = await sb.from('user_private').select('email').eq('id', uid).maybeSingle();
+    return (r?['email'] ?? '') as String;
+  }
 
   // ---------- Publicaciones ----------
 
@@ -36,99 +267,65 @@ class Db {
     String groupId = '',
     String description = '',
     List<String> pollOptions = const [],
-  }) {
-    final b = fs.batch();
-    b.set(posts.doc(), {
-      'authorId': myUid,
-      'authorName': Session.i.username,
+  }) async {
+    await sb.from('posts').insert({
       'text': text,
-      'imageUrl': imageUrl,
-      'videoUrl': videoUrl,
-      'linkUrl': linkUrl,
-      'groupId': groupId,
+      'image_url': imageUrl,
+      'video_url': videoUrl,
+      'link_url': linkUrl,
+      'group_id': groupId,
       'description': description,
-      'pollOptions': pollOptions,
-      'pollCounts': {for (var i = 0; i < pollOptions.length; i++) '$i': 0},
-      'views': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-      'likesCount': 0,
-      'commentsCount': 0,
+      'poll_options': pollOptions,
     });
-    // Freno anti-bots: el servidor exige separar cada acción unos segundos.
-    b.update(users.doc(myUid), {'lastActionAt': FieldValue.serverTimestamp()});
-    return b.commit();
-  }
-
-  static Future<void> setLike(String postId, bool like) {
-    final p = posts.doc(postId);
-    final l = p.collection('likes').doc(myUid);
-    final b = fs.batch();
-    if (like) {
-      b.set(l, {'createdAt': FieldValue.serverTimestamp()});
-      b.update(p, {'likesCount': FieldValue.increment(1)});
-    } else {
-      b.delete(l);
-      b.update(p, {'likesCount': FieldValue.increment(-1)});
-    }
-    return b.commit();
   }
 
   /// Reacciona a una publicación. Si ya tenías esa misma reacción, la quita;
-  /// si tenías otra, la cambia (el contador total no cambia).
+  /// si tenías otra, la cambia.
   static Future<void> react(String postId, String type) async {
-    final p = posts.doc(postId);
-    final l = p.collection('likes').doc(myUid);
-    final snap = await l.get();
-    final cur = snap.exists ? ((snap.data()?['type'] ?? 'love') as String) : null;
+    final mine = Session.i.myLikes;
+    final cur = mine.value[postId];
     if (cur == null) {
-      final b = fs.batch();
-      b.set(l, {'createdAt': FieldValue.serverTimestamp(), 'type': type});
-      b.update(p, {'likesCount': FieldValue.increment(1)});
-      await b.commit();
+      await sb.from('likes').insert({'post_id': postId, 'type': type});
+      mine.value = {...mine.value, postId: type};
     } else if (cur == type) {
-      final b = fs.batch();
-      b.delete(l);
-      b.update(p, {'likesCount': FieldValue.increment(-1)});
-      await b.commit();
+      await sb.from('likes').delete().eq('post_id', postId).eq('user_id', myUid);
+      final m = {...mine.value}..remove(postId);
+      mine.value = m;
     } else {
-      await l.update({'type': type});
+      await sb
+          .from('likes')
+          .update({'type': type})
+          .eq('post_id', postId)
+          .eq('user_id', myUid);
+      mine.value = {...mine.value, postId: type};
     }
   }
 
   /// Cuenta cuántas reacciones hay de cada tipo.
   static Future<Map<String, int>> reactionCounts(String postId) async {
-    final q = await posts.doc(postId).collection('likes').limit(1000).get();
+    final rows = await sb.from('likes').select('type').eq('post_id', postId).limit(1000);
     final out = <String, int>{};
-    for (final d in q.docs) {
-      final t = (d.data()['type'] ?? 'love') as String;
+    for (final d in rows) {
+      final t = (d['type'] ?? 'love') as String;
       out[t] = (out[t] ?? 0) + 1;
     }
     return out;
   }
 
   /// Vota en la encuesta de una publicación (un voto por persona).
-  static Future<void> vote(String postId, int option) {
-    final p = posts.doc(postId);
-    final b = fs.batch();
-    b.set(p.collection('votes').doc(myUid), {
-      'option': option,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    b.update(p, {'pollCounts.$option': FieldValue.increment(1)});
-    return b.commit();
+  static Future<void> vote(String postId, int option) async {
+    await sb.from('votes').insert({'post_id': postId, 'option_index': option});
+    Session.i.myVotes.value = {...Session.i.myVotes.value, postId: option};
   }
 
   /// Guarda la opinión (estrellas + motivo) y, si está configurado, la manda
   /// también al correo por medio de Formspree.
   static Future<void> sendFeedback(int stars, String reason) async {
     final name = Session.i.username;
-    await fs.collection('feedback').add({
-      'userId': myUid,
-      'username': name,
+    await sb.from('feedback').insert({
       'stars': stars,
       'reason': reason,
       'platform': kIsWeb ? 'web' : 'android',
-      'createdAt': FieldValue.serverTimestamp(),
     });
     final url = FeedbackConfig.emailFormUrl;
     if (url.isEmpty) return;
@@ -150,7 +347,7 @@ class Db {
           )
           .timeout(const Duration(seconds: 15));
     } catch (_) {
-      // Si el correo falla, la opinión ya quedó guardada en Firestore.
+      // Si el correo falla, la opinión ya quedó guardada.
     }
   }
 
@@ -160,13 +357,8 @@ class Db {
   static Future<void> registerView(String postId, String authorId) async {
     if (authorId == myUid || !_seenViews.add(postId)) return;
     try {
-      final p = posts.doc(postId);
-      final v = p.collection('views').doc(myUid);
-      if ((await v.get()).exists) return;
-      final b = fs.batch();
-      b.set(v, {'createdAt': FieldValue.serverTimestamp()});
-      b.update(p, {'views': FieldValue.increment(1)});
-      await b.commit();
+      await sb.from('views').upsert({'post_id': postId, 'user_id': myUid},
+          onConflict: 'post_id,user_id', ignoreDuplicates: true);
     } catch (_) {
       // Una visita que falla no debe molestar a nadie.
     }
@@ -177,34 +369,20 @@ class Db {
     String text, {
     String parentId = '',
     String replyToName = '',
-  }) {
-    final p = posts.doc(postId);
-    final c = p.collection('comments').doc();
-    final b = fs.batch();
-    b.set(c, {
-      'authorId': myUid,
-      'authorName': Session.i.username,
+  }) async {
+    await sb.from('comments').insert({
+      'post_id': postId,
       'text': text,
-      'parentId': parentId,
-      'replyToName': replyToName,
-      'createdAt': FieldValue.serverTimestamp(),
+      'parent_id': parentId,
+      'reply_to_name': replyToName,
     });
-    b.update(p, {'commentsCount': FieldValue.increment(1)});
-    b.update(users.doc(myUid), {'lastActionAt': FieldValue.serverTimestamp()});
-    return b.commit();
   }
 
-  static Future<void> deleteComment(String postId, String commentId) {
-    final p = posts.doc(postId);
-    final b = fs.batch();
-    b.delete(p.collection('comments').doc(commentId));
-    b.update(p, {'commentsCount': FieldValue.increment(-1)});
-    return b.commit();
+  static Future<void> deleteComment(String postId, String commentId) async {
+    await sb.from('comments').delete().eq('id', commentId);
   }
 
   // ---------- Chats privados ----------
-
-  static CollectionReference<Json> get chats => fs.collection('chats');
 
   static String chatId(String a, String b) {
     final ids = [a, b]..sort();
@@ -216,111 +394,49 @@ class Db {
     String otherName,
     String text,
   ) async {
-    final ids = [myUid, otherUid]..sort();
-    final ref = chats.doc(ids.join('_'));
-    final snap = await ref.get();
-    if (!snap.exists) {
-      await ref.set({
-        'members': ids,
-        'names': {myUid: Session.i.username, otherUid: otherName},
-        'lastMessage': '',
-        'lastAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-    final b = fs.batch();
-    b.set(ref.collection('messages').doc(), {
-      'senderId': myUid,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    b.update(ref, {
-      'lastMessage': text.length > 100 ? text.substring(0, 100) : text,
-      'lastAt': FieldValue.serverTimestamp(),
-    });
-    await b.commit();
+    await sb.rpc('send_message', params: {'p_other': otherUid, 'p_body': text});
   }
 
   // ---------- Grupos ----------
 
-  static Future<void> createGroup(String name, String description) {
-    final g = groups.doc();
-    final b = fs.batch();
-    b.set(g, {
-      'name': name,
-      'description': description,
-      'ownerId': myUid,
-      'ownerName': Session.i.username,
-      'membersCount': 1,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    b.set(g.collection('members').doc(myUid),
-        {'createdAt': FieldValue.serverTimestamp()});
-    return b.commit();
+  static Future<void> createGroup(String name, String description) async {
+    await sb.from('groups').insert({'name': name, 'description': description});
   }
 
-  static Future<void> joinGroup(String groupId) {
-    final g = groups.doc(groupId);
-    final b = fs.batch();
-    b.set(g.collection('members').doc(myUid),
-        {'createdAt': FieldValue.serverTimestamp()});
-    b.update(g, {'membersCount': FieldValue.increment(1)});
-    return b.commit();
+  static Future<void> joinGroup(String groupId) async {
+    await sb.from('group_members').insert({'group_id': groupId});
   }
 
-  static Future<void> leaveGroup(String groupId) {
-    final g = groups.doc(groupId);
-    final b = fs.batch();
-    b.delete(g.collection('members').doc(myUid));
-    b.update(g, {'membersCount': FieldValue.increment(-1)});
-    return b.commit();
+  static Future<void> leaveGroup(String groupId) async {
+    await sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', myUid);
   }
 
   /// Borra el grupo y sus publicaciones (dueño o admin).
   static Future<void> deleteGroup(String groupId) async {
-    final mine = await posts.where('groupId', isEqualTo: groupId).get();
-    final docs = mine.docs;
-    for (var i = 0; i < docs.length; i += 400) {
-      final b = fs.batch();
-      for (final d in docs.skip(i).take(400)) {
-        b.delete(d.reference);
-      }
-      await b.commit();
-    }
-    await groups.doc(groupId).delete();
+    await sb.rpc('delete_group', params: {'p_group': groupId});
   }
 
   // ---------- Seguir / bloquear ----------
 
-  static Future<void> follow(String other) {
-    final b = fs.batch();
-    b.set(users.doc(myUid).collection('following').doc(other),
-        {'createdAt': FieldValue.serverTimestamp()});
-    b.set(users.doc(other).collection('followers').doc(myUid),
-        {'createdAt': FieldValue.serverTimestamp()});
-    return b.commit();
+  static Future<void> follow(String other) async {
+    await sb.from('follows').insert({'follower_id': myUid, 'following_id': other});
   }
 
-  static Future<void> unfollow(String other) {
-    final b = fs.batch();
-    b.delete(users.doc(myUid).collection('following').doc(other));
-    b.delete(users.doc(other).collection('followers').doc(myUid));
-    return b.commit();
+  static Future<void> unfollow(String other) async {
+    await sb.from('follows').delete().eq('follower_id', myUid).eq('following_id', other);
   }
 
-  static Future<void> block(String other, String name) {
-    final b = fs.batch();
-    b.set(users.doc(myUid).collection('blocked').doc(other), {
+  static Future<void> block(String other, String name) async {
+    await sb.from('blocks').upsert({
+      'blocker_id': myUid,
+      'blocked_id': other,
       'username': name,
-      'createdAt': FieldValue.serverTimestamp(),
     });
-    b.delete(users.doc(myUid).collection('following').doc(other));
-    b.delete(users.doc(other).collection('followers').doc(myUid));
-    return b.commit();
+    await unfollow(other);
   }
 
-  static Future<void> unblock(String other) {
-    return users.doc(myUid).collection('blocked').doc(other).delete();
+  static Future<void> unblock(String other) async {
+    await sb.from('blocks').delete().eq('blocker_id', myUid).eq('blocked_id', other);
   }
 
   // ---------- Perfil ----------
@@ -329,12 +445,13 @@ class Db {
     required String bio,
     required String photoUrl,
     required List<String> favoriteGames,
-  }) {
-    return users.doc(myUid).update({
+  }) async {
+    await sb.from('profiles').update({
       'bio': bio,
-      'photoUrl': photoUrl,
-      'favoriteGames': favoriteGames,
-    });
+      'photo_url': photoUrl,
+      'favorite_games': favoriteGames,
+    }).eq('id', myUid);
+    forgetProfile(myUid);
   }
 
   // ---------- Reportes ----------
@@ -346,66 +463,38 @@ class Db {
     required String reason,
     String? postId,
     String preview = '',
-  }) {
-    return reports.add({
+  }) async {
+    await sb.from('reports').insert({
       'type': type,
-      'targetId': targetId,
-      'postId': postId ?? '',
-      'ownerId': ownerId,
+      'target_id': targetId,
+      'post_id': postId ?? '',
+      'owner_id': ownerId,
       'reason': reason,
-      'reporterId': myUid,
-      'reporterName': Session.i.username,
       'preview': preview.length > 140 ? preview.substring(0, 140) : preview,
-      'createdAt': FieldValue.serverTimestamp(),
     });
   }
 
   // ---------- Solo administrador ----------
 
-  static Future<void> setBanned(String userId, bool banned) {
-    return users.doc(userId).update({'banned': banned});
+  static Future<void> setBanned(String userId, bool banned) async {
+    await sb.rpc('admin_set_banned', params: {'p_user': userId, 'p_banned': banned});
   }
 
-  /// Borra las publicaciones del usuario, libera su nombre de usuario y
-  /// deja la cuenta bloqueada y marcada como eliminada.
-  static Future<void> adminDeleteUser(
-    String userId,
-    String usernameLower,
-  ) async {
-    final mine = await posts.where('authorId', isEqualTo: userId).get();
-    final docs = mine.docs;
-    for (var i = 0; i < docs.length; i += 400) {
-      final b = fs.batch();
-      for (final d in docs.skip(i).take(400)) {
-        b.delete(d.reference);
-      }
-      await b.commit();
-    }
-    final b = fs.batch();
-    b.update(users.doc(userId), {
-      'banned': true,
-      'deleted': true,
-      'username': '[eliminado]',
-      'usernameLower': '[eliminado]',
-      'bio': '',
-      'photoUrl': '',
-    });
-    if (usernameLower.isNotEmpty && usernameLower != '[eliminado]') {
-      b.delete(usernames.doc(usernameLower));
-    }
-    await b.commit();
+  /// Borra las publicaciones del usuario y deja la cuenta bloqueada.
+  static Future<void> adminDeleteUser(String userId, String usernameLower) async {
+    await sb.rpc('admin_delete_user', params: {'p_user': userId});
   }
 
-  static Future<void> adminDeletePost(String postId) {
-    return posts.doc(postId).delete();
+  static Future<void> adminDeletePost(String postId) async {
+    await sb.from('posts').delete().eq('id', postId);
   }
 
-  static Future<void> dismissReport(String reportId) {
-    return reports.doc(reportId).delete();
+  static Future<void> dismissReport(String reportId) async {
+    await sb.from('reports').delete().eq('id', reportId);
   }
 }
 
-/// Datos de la sesión actual (bloqueados, seguidos, si es admin).
+/// Datos de la sesión actual (bloqueados, seguidos, si es admin, mis votos).
 class Session {
   Session._();
   static final Session i = Session._();
@@ -413,52 +502,57 @@ class Session {
   final ValueNotifier<Set<String>> blocked = ValueNotifier<Set<String>>({});
   final ValueNotifier<Set<String>> following = ValueNotifier<Set<String>>({});
   final ValueNotifier<bool> isAdmin = ValueNotifier<bool>(false);
+  final ValueNotifier<Map<String, String>> myLikes =
+      ValueNotifier<Map<String, String>>({});
+  final ValueNotifier<Map<String, int>> myVotes = ValueNotifier<Map<String, int>>({});
   String username = '';
 
   final List<StreamSubscription<dynamic>> _subs = [];
 
   void start(String uid) {
     stop();
-    final me = Db.users.doc(uid);
-    _moveEmailToPrivate(uid);
-    _subs.add(me.snapshots().listen(
-          (s) => username = (s.data()?['username'] as String?) ?? username,
-          onError: (_) {},
-        ));
-    _subs.add(me.collection('blocked').snapshots().listen(
-          (s) => blocked.value = s.docs.map((d) => d.id).toSet(),
-          onError: (_) {},
-        ));
-    _subs.add(me.collection('following').snapshots().listen(
-          (s) => following.value = s.docs.map((d) => d.id).toSet(),
-          onError: (_) {},
-        ));
-    _subs.add(fs.collection('admins').doc(uid).snapshots().listen(
-          (s) => isAdmin.value = s.exists,
-          onError: (_) => isAdmin.value = false,
-        ));
+    _subs.add(Db.watchProfile(uid).listen(
+      (d) => username = (d.data()['username'] as String?) ?? username,
+      onError: (_) {},
+    ));
+    _subs.add(watchQuery(
+      'blocks',
+      () => sb.from('blocks').select().eq('blocker_id', uid),
+      id: (r) => r['blocked_id'].toString(),
+    ).listen(
+      (s) => blocked.value = s.docs.map((d) => d.id).toSet(),
+      onError: (_) {},
+    ));
+    _subs.add(watchQuery(
+      'follows',
+      () => sb.from('follows').select().eq('follower_id', uid),
+      id: (r) => r['following_id'].toString(),
+    ).listen(
+      (s) => following.value = s.docs.map((d) => d.id).toSet(),
+      onError: (_) {},
+    ));
+    _subs.add(watchQuery(
+      'admins',
+      () => sb.from('admins').select().eq('user_id', uid),
+      id: (r) => r['user_id'].toString(),
+    ).listen(
+      (s) => isAdmin.value = s.docs.isNotEmpty,
+      onError: (_) => isAdmin.value = false,
+    ));
+    _loadMine(uid);
   }
 
-  /// Los correos ya no se guardan en el perfil público: se pasan a
-  /// userPrivate/<uid>, que solo puedes leer tú y el admin.
-  Future<void> _moveEmailToPrivate(String uid) async {
+  Future<void> _loadMine(String uid) async {
     try {
-      final me = Db.users.doc(uid);
-      final snap = await me.get();
-      final data = snap.data();
-      if (data == null || !data.containsKey('email')) return;
-      final email = (data['email'] ?? '') as String;
-      final priv = fs.collection('userPrivate').doc(uid);
-      if (!(await priv.get()).exists && email.isNotEmpty) {
-        await priv.set({
-          'email': email,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-      await me.update({'email': FieldValue.delete()});
-    } catch (_) {
-      // Si falla, se intentará de nuevo la próxima vez que abra la app.
-    }
+      final likes = await sb.from('likes').select('post_id,type').eq('user_id', uid);
+      myLikes.value = {
+        for (final r in likes) r['post_id'].toString(): (r['type'] ?? 'love') as String,
+      };
+      final votes = await sb.from('votes').select('post_id,option_index').eq('user_id', uid);
+      myVotes.value = {
+        for (final r in votes) r['post_id'].toString(): (r['option_index'] as num).toInt(),
+      };
+    } catch (_) {}
   }
 
   void stop() {
@@ -469,6 +563,8 @@ class Session {
     blocked.value = {};
     following.value = {};
     isAdmin.value = false;
+    myLikes.value = {};
+    myVotes.value = {};
   }
 }
 

@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../net.dart';
@@ -15,10 +14,10 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  late final Stream<QuerySnapshot<Json>> _stream =
-      Db.posts.orderBy('createdAt', descending: true).limit(100).snapshots();
+  late final Stream<Snap> _stream =
+      Db.watchPosts();
 
-  Widget _list(List<QueryDocumentSnapshot<Json>> docs, String empty) {
+  Widget _list(List<Doc> docs, String empty) {
     if (docs.isEmpty) {
       return Center(
         child: Padding(
@@ -64,7 +63,7 @@ class _FeedScreenState extends State<FeedScreen> {
             tabs: [Tab(text: 'Para ti'), Tab(text: 'Siguiendo'), Tab(text: 'Chats')],
           ),
         ),
-        body: StreamBuilder<QuerySnapshot<Json>>(
+        body: StreamBuilder<Snap>(
           stream: _stream,
           builder: (context, snap) {
             if (snap.hasError) {

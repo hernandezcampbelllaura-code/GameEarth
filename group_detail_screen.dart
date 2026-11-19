@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -15,17 +14,11 @@ class GroupDetailScreen extends StatefulWidget {
 }
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
-  late final Stream<DocumentSnapshot<Json>> _group =
-      Db.groups.doc(widget.groupId).snapshots();
-  late final Stream<DocumentSnapshot<Json>> _member = Db.groups
-      .doc(widget.groupId)
-      .collection('members')
-      .doc(myUid)
-      .snapshots();
-  late final Stream<QuerySnapshot<Json>> _posts =
-      Db.posts.where('groupId', isEqualTo: widget.groupId).snapshots();
+  late final Stream<Doc> _group = Db.watchGroup(widget.groupId);
+  late final Stream<Doc> _member = Db.watchMembership(widget.groupId);
+  late final Stream<Snap> _posts = Db.watchPosts(groupId: widget.groupId);
 
-  int _millis(dynamic ts) => ts is Timestamp
+  int _millis(dynamic ts) => ts is DateTime
       ? ts.millisecondsSinceEpoch
       : DateTime.now().millisecondsSinceEpoch;
 
@@ -43,7 +36,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot<Json>>(
+    return StreamBuilder<Doc>(
       stream: _group,
       builder: (context, gs) {
         if (gs.hasError) {
@@ -73,7 +66,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         final isOwner = ownerId == myUid;
         final canDelete = isOwner || Session.i.isAdmin.value;
 
-        return StreamBuilder<DocumentSnapshot<Json>>(
+        return StreamBuilder<Doc>(
           stream: _member,
           builder: (context, ms) {
             final joined = ms.data?.exists ?? false;
@@ -139,7 +132,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     ),
                   ),
                   const Divider(height: 1),
-                  StreamBuilder<QuerySnapshot<Json>>(
+                  StreamBuilder<Snap>(
                     stream: _posts,
                     builder: (context, ps) {
                       if (ps.hasError) {

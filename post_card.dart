@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -12,7 +11,7 @@ import 'report_dialog.dart';
 import 'user_avatar.dart';
 
 class PostCard extends StatelessWidget {
-  final DocumentSnapshot<Json> doc;
+  final Doc doc;
   const PostCard({super.key, required this.doc});
 
   Future<void> _menu(

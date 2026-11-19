@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../net.dart';
@@ -17,8 +16,7 @@ class ChatsTab extends StatefulWidget {
 }
 
 class _ChatsTabState extends State<ChatsTab> {
-  late final Stream<QuerySnapshot<Json>> _stream =
-      Db.chats.where('members', arrayContains: myUid).snapshots();
+  late final Stream<Snap> _stream = Db.watchChats();
 
   Future<void> _newChat() async {
     final r = await Navigator.push<List<String>>(
@@ -43,7 +41,7 @@ class _ChatsTabState extends State<ChatsTab> {
         icon: const Icon(Icons.edit),
         label: const Text('Nuevo chat'),
       ),
-      body: StreamBuilder<QuerySnapshot<Json>>(
+      body: StreamBuilder<Snap>(
         stream: _stream,
         builder: (context, snap) {
           if (snap.hasError) {
@@ -62,8 +60,8 @@ class _ChatsTabState extends State<ChatsTab> {
                 ..sort((a, b) {
                   final x = a.data()['lastAt'];
                   final y = b.data()['lastAt'];
-                  final tx = x is Timestamp ? x.millisecondsSinceEpoch : 0;
-                  final ty = y is Timestamp ? y.millisecondsSinceEpoch : 0;
+                  final tx = x is DateTime ? x.millisecondsSinceEpoch : 0;
+                  final ty = y is DateTime ? y.millisecondsSinceEpoch : 0;
                   return ty.compareTo(tx);
                 });
               if (docs.isEmpty) {
@@ -138,12 +136,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final _ctrl = TextEditingController();
   bool _sending = false;
 
-  late final Stream<QuerySnapshot<Json>> _stream = Db.chats
-      .doc(Db.chatId(myUid, widget.otherUid))
-      .collection('messages')
-      .orderBy('createdAt', descending: true)
-      .limit(100)
-      .snapshots();
+  late final Stream<Snap> _stream =
+      Db.watchMessages(Db.chatId(myUid, widget.otherUid));
 
   @override
   void dispose() {
@@ -189,7 +183,7 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Json>>(
+            child: StreamBuilder<Snap>(
               stream: _stream,
               builder: (context, snap) {
                 if (snap.hasError) {

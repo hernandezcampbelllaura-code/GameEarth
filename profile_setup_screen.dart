@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../net.dart';
@@ -9,7 +7,8 @@ import 'auth_screen.dart';
 
 /// Se muestra una sola vez, cuando la cuenta nueva aún no tiene perfil.
 class ProfileSetupScreen extends StatefulWidget {
-  const ProfileSetupScreen({super.key});
+  final VoidCallback? onSaved;
+  const ProfileSetupScreen({super.key, this.onSaved});
   @override
   State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
@@ -24,8 +23,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   void initState() {
     super.initState();
     // Si entró con Google, se rellena el nombre de usuario con su nombre.
-    final u = FirebaseAuth.instance.currentUser;
-    var base = (u?.displayName ?? '').replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
+    final u = sb.auth.currentUser;
+    var base = (u?.userMetadata?['full_name'] ?? u?.userMetadata?['name'] ?? '')
+        .toString()
+        .replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
     if (base.isEmpty) {
       base = (u?.email ?? '').split('@').first.replaceAll(RegExp(r'[^A-Za-z0-9_]'), '');
     }
@@ -59,34 +60,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _error = null;
     });
     try {
-      final lower = name.toLowerCase();
-      final nameRef = fs.collection('usernames').doc(lower);
-      final userRef = Db.users.doc(myUid);
-      final email = FirebaseAuth.instance.currentUser?.email ?? '';
-      // Transacción: garantiza que el nombre de usuario sea único.
-      await fs.runTransaction((tx) async {
-        final existing = await tx.get(nameRef);
-        if (existing.exists) throw Exception('taken');
-        tx.set(nameRef, {'uid': myUid});
-        tx.set(fs.collection('userPrivate').doc(myUid), {
-          'email': email,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        tx.set(userRef, {
-          'username': name,
-          'usernameLower': lower,
-          'bio': '',
-          'photoUrl': '',
-          'favoriteGames': <String>[],
-          'banned': false,
-          'acceptedTerms': true,
-          'termsVersion': kTermsVersion,
-          'acceptedTermsAt': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      await sb.from('profiles').insert({
+        'id': myUid,
+        'username': name,
+        'username_lower': name.toLowerCase(),
+        'accepted_terms': true,
+        'terms_version': kTermsVersion,
       });
+      Db.forgetProfile(myUid);
+      widget.onSaved?.call();
     } catch (e) {
-      setState(() => _error = e.toString().contains('taken')
+      setState(() => _error = (e.toString().contains('23505') || e.toString().contains('duplicate'))
           ? 'Ese nombre ya está en uso.'
           : 'No se pudo guardar: $e');
     } finally {
@@ -101,7 +85,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         title: const Text('Crea tu perfil'),
         actions: [
           TextButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () => sb.auth.signOut(),
             child: const Text('Salir'),
           ),
         ],

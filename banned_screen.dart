@@ -1,6 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../services/db.dart';
 import '../util.dart';
 
 class BannedScreen extends StatelessWidget {
@@ -34,7 +34,7 @@ class BannedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: () => FirebaseAuth.instance.signOut(),
+                onPressed: () => sb.auth.signOut(),
                 child: const Text('Cerrar sesión'),
               ),
             ],

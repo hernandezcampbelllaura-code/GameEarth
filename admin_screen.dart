@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -7,7 +6,7 @@ import '../widgets/user_avatar.dart';
 import 'profile_screen.dart';
 
 /// Panel de administración. Solo se muestra si existe el documento
-/// admins/<tu uid>, y además las reglas de Firestore lo exigen en el servidor.
+/// admins/<tu uid>, y además la base de datos lo exige en el servidor.
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
@@ -16,17 +15,10 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
-  late final Stream<QuerySnapshot<Json>> _users =
-      Db.users.orderBy('createdAt', descending: true).limit(200).snapshots();
-  late final Stream<QuerySnapshot<Json>> _posts =
-      Db.posts.orderBy('createdAt', descending: true).limit(100).snapshots();
-  late final Stream<QuerySnapshot<Json>> _feedback = fs
-      .collection('feedback')
-      .orderBy('createdAt', descending: true)
-      .limit(100)
-      .snapshots();
-  late final Stream<QuerySnapshot<Json>> _reports =
-      Db.reports.orderBy('createdAt', descending: true).limit(100).snapshots();
+  late final Stream<Snap> _users = Db.watchUsers();
+  late final Stream<Snap> _posts = Db.watchPosts();
+  late final Stream<Snap> _feedback = Db.watchFeedback();
+  late final Stream<Snap> _reports = Db.watchReports();
 
   void _openProfile(String uid) {
     Navigator.push(
@@ -63,14 +55,14 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _states(AsyncSnapshot<QuerySnapshot<Json>> snap) {
+  Widget _states(AsyncSnapshot<Snap> snap) {
     if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
     return const Center(child: CircularProgressIndicator());
   }
 
   // ---------------- Usuarios ----------------
 
-  Future<void> _userAction(String v, QueryDocumentSnapshot<Json> d) async {
+  Future<void> _userAction(String v, Doc d) async {
     final u = d.data();
     final name = (u['username'] ?? '') as String;
     final banned = u['banned'] == true;
@@ -97,7 +89,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _usersTab() {
-    return StreamBuilder<QuerySnapshot<Json>>(
+    return StreamBuilder<Snap>(
       stream: _users,
       builder: (context, snap) {
         if (!snap.hasData) return _states(snap);
@@ -137,12 +129,10 @@ class _AdminScreenState extends State<AdminScreen> {
                         if (deleted) _chip('ELIMINADO', Colors.redAccent),
                       ],
                     ),
-                    subtitle: FutureBuilder<DocumentSnapshot<Json>>(
-                      future: fs.collection('userPrivate').doc(d.id).get(),
+                    subtitle: FutureBuilder<String>(
+                      future: Db.userEmail(d.id),
                       builder: (context, es) {
-                        final email = (es.data?.data()?['email'] ??
-                                u['email'] ??
-                                '') as String;
+                        final email = es.data ?? '';
                         return Text(
                           '$email\nRegistro: ${formatFullDate(u['createdAt'])}',
                         );
@@ -181,7 +171,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   // ---------------- Publicaciones ----------------
 
-  Future<void> _postAction(String v, QueryDocumentSnapshot<Json> d) async {
+  Future<void> _postAction(String v, Doc d) async {
     final p = d.data();
     final authorId = (p['authorId'] ?? '') as String;
     final author = (p['authorName'] ?? '') as String;
@@ -196,7 +186,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _postsTab() {
-    return StreamBuilder<QuerySnapshot<Json>>(
+    return StreamBuilder<Snap>(
       stream: _posts,
       builder: (context, snap) {
         if (!snap.hasData) return _states(snap);
@@ -236,7 +226,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   // ---------------- Reportes ----------------
 
-  Future<void> _reportAction(String v, QueryDocumentSnapshot<Json> d) async {
+  Future<void> _reportAction(String v, Doc d) async {
     final r = d.data();
     final type = (r['type'] ?? '') as String;
     final target = (r['targetId'] ?? '') as String;
@@ -272,7 +262,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _feedbackTab() {
-    return StreamBuilder<QuerySnapshot<Json>>(
+    return StreamBuilder<Snap>(
       stream: _feedback,
       builder: (context, snap) {
         if (!snap.hasData) return _states(snap);
@@ -324,7 +314,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _reportsTab() {
-    return StreamBuilder<QuerySnapshot<Json>>(
+    return StreamBuilder<Snap>(
       stream: _reports,
       builder: (context, snap) {
         if (!snap.hasData) return _states(snap);

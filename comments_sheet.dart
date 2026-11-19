@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../net.dart';
@@ -31,11 +30,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
   String _replyParent = '';
   String _replyName = '';
 
-  late final Stream<QuerySnapshot<Json>> _stream = Db.posts
-      .doc(widget.postId)
-      .collection('comments')
-      .orderBy('createdAt')
-      .snapshots();
+  late final Stream<Snap> _stream = Db.watchComments(widget.postId);
 
   @override
   void dispose() {
@@ -113,7 +108,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
             ),
             const Divider(height: 20),
             Expanded(
-              child: StreamBuilder<QuerySnapshot<Json>>(
+              child: StreamBuilder<Snap>(
                 stream: _stream,
                 builder: (context, snap) {
                   if (snap.hasError) {
@@ -135,14 +130,14 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                       }
                       // Comentarios principales y, debajo de cada uno, sus respuestas.
                       final ids = {for (final d in all) d.id};
-                      String parentOf(QueryDocumentSnapshot<Json> d) =>
+                      String parentOf(Doc d) =>
                           ((d.data()['parentId'] ?? '') as String);
                       final roots = all
                           .where((d) =>
                               parentOf(d).isEmpty || !ids.contains(parentOf(d)))
                           .toList();
                       final rows =
-                          <MapEntry<QueryDocumentSnapshot<Json>, bool>>[];
+                          <MapEntry<Doc, bool>>[];
                       for (final r in roots) {
                         rows.add(MapEntry(r, false));
                         for (final x in all) {

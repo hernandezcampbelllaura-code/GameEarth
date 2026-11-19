@@ -96,12 +96,10 @@ class ReactionBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: Db.posts.doc(postId).collection('likes').doc(myUid).snapshots(),
-      builder: (context, snap) {
-        final exists = snap.data?.exists ?? false;
-        final String? mine =
-            exists ? ((snap.data?.data()?['type'] ?? 'love') as String) : null;
+    return ValueListenableBuilder<Map<String, String>>(
+      valueListenable: Session.i.myLikes,
+      builder: (context, likes, _) {
+        final String? mine = likes[postId];
         return builder(
           context,
           mine,

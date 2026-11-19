@@ -1,20 +1,18 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
-import 'firebase_options.dart';
+import 'config.dart';
 import 'net.dart';
+import 'services/db.dart';
 import 'screens/auth_screen.dart';
 import 'screens/banned_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
 import 'theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, AuthState;
 
-/// La app se dibuja al instante (pantalla de inicio) y Firebase se prepara
+/// La app se dibuja al instante (pantalla de inicio) y la conexión se prepara
 /// por detrás, para que nunca se vea una pantalla en blanco.
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +20,10 @@ void main() {
 }
 
 Future<void> _init() async {
-  await Firebase.initializeApp(
-    options: kIsWeb ? AppFirebaseOptions.web : AppFirebaseOptions.android,
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
   );
-  try {
-    FirebaseFirestore.instance.settings =
-        const Settings(persistenceEnabled: true);
-  } catch (_) {}
   await Net.i.start();
 }
 
@@ -145,32 +140,60 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    return StreamBuilder<AuthState>(
+      stream: sb.auth.onAuthStateChange,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const _Loader();
-        }
-        final user = snap.data;
+        final user = sb.auth.currentUser;
         if (user == null) return const AuthScreen();
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .snapshots(),
-          builder: (context, ps) {
-            if (ps.hasError) {
-              return Scaffold(
-                body: Center(child: Text('Error: ${ps.error}')),
-              );
-            }
-            if (!ps.hasData) return const _Loader();
-            final doc = ps.data!;
-            if (!doc.exists) return const ProfileSetupScreen();
-            if (doc.data()?['banned'] == true) return const BannedScreen();
-            return HomeShell(uid: user.uid);
-          },
-        );
+        return _ProfileGate(key: ValueKey(user.id), uid: user.id);
+      },
+    );
+  }
+}
+
+class _ProfileGate extends StatefulWidget {
+  final String uid;
+  const _ProfileGate({super.key, required this.uid});
+
+  @override
+  State<_ProfileGate> createState() => _ProfileGateState();
+}
+
+class _ProfileGateState extends State<_ProfileGate> {
+  late Stream<Doc> _stream = Db.watchProfile(widget.uid);
+
+  void _reload() => setState(() => _stream = Db.watchProfile(widget.uid));
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Doc>(
+      stream: _stream,
+      builder: (context, ps) {
+        if (ps.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Error: ${ps.error}'),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () => sb.auth.signOut(),
+                      child: const Text('Salir'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+        if (!ps.hasData) return const _Loader();
+        final doc = ps.data!;
+        if (!doc.exists) return ProfileSetupScreen(onSaved: _reload);
+        if (doc.data()['banned'] == true) return const BannedScreen();
+        return HomeShell(uid: widget.uid);
       },
     );
   }

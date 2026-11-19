@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -7,7 +6,7 @@ import '../util.dart';
 /// Votación dentro de una publicación: botones para votar y, después de votar
 /// (o si eres el autor), barras con el porcentaje de cada opción.
 class PollBlock extends StatelessWidget {
-  final DocumentSnapshot<Json> doc;
+  final Doc doc;
   const PollBlock({super.key, required this.doc});
 
   @override
@@ -26,11 +25,11 @@ class PollBlock extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(top: 10, right: 6),
-      child: StreamBuilder<DocumentSnapshot<Json>>(
-        stream: doc.reference.collection('votes').doc(myUid).snapshots(),
-        builder: (context, snap) {
-          final voted = snap.data?.exists ?? false;
-          final mine = voted ? (snap.data?.data()?['option'] as num?)?.toInt() : null;
+      child: ValueListenableBuilder<Map<String, int>>(
+        valueListenable: Session.i.myVotes,
+        builder: (context, votes, _) {
+          final mine = votes[doc.id];
+          final voted = mine != null;
           final showResults = voted || isAuthor;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,

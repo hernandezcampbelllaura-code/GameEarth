@@ -1,9 +1,9 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../net.dart';
 import '../safety.dart';
+import '../services/db.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 import '../util.dart';
 
@@ -11,7 +11,7 @@ import '../util.dart';
 const int kTermsVersion = 1;
 
 /// Recuerda, mientras la app está abierta, que la persona marcó la casilla
-/// al registrarse (se guarda en Firestore al crear el perfil).
+/// al registrarse (se guarda en la base de datos al crear el perfil).
 class TermsState {
   static bool accepted = false;
 }
@@ -76,24 +76,28 @@ class _AuthScreenState extends State<AuthScreen> {
       _error = null;
     });
     try {
-      final auth = FirebaseAuth.instance;
       if (_register) {
         TermsState.accepted = true;
-        await auth.createUserWithEmailAndPassword(
+        final r = await sb.auth.signUp(
           email: _email.text.trim(),
           password: _pass.text,
         );
+        if (r.session == null && mounted) {
+          TermsState.accepted = false;
+          setState(() => _error =
+              'Te enviamos un correo para confirmar tu cuenta. Ábrelo y vuelve a entrar.');
+        }
       } else {
-        await auth.signInWithEmailAndPassword(
+        await sb.auth.signInWithPassword(
           email: _email.text.trim(),
           password: _pass.text,
         );
       }
-    } on FirebaseAuthException catch (e) {
+    } on AuthException catch (e) {
       TermsState.accepted = false;
-      var msg = _message(e.code, e.message);
-      if (!_register &&
-          (e.code == 'user-not-found' || e.code == 'invalid-credential')) {
+      final code = (e.code ?? e.message).toString();
+      var msg = _message(code, e.message);
+      if (!_register && code.contains('invalid')) {
         msg = await _loginFailMessage(msg);
         _fails++;
         if (_fails >= 5) {
@@ -111,56 +115,20 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  /// Distingue "no existe la cuenta" de "contraseña incorrecta". Para que
-  /// funcione, en Firebase debe estar desactivada la "Protección de
-  /// enumeración de correos".
+  /// Distingue "no existe la cuenta" de "contraseña incorrecta".
   Future<String> _loginFailMessage(String fallback) async {
     try {
-      // ignore: deprecated_member_use
-      final methods = await FirebaseAuth.instance
-          .fetchSignInMethodsForEmail(_email.text.trim());
-      if (methods.isEmpty) {
+      final exists = await sb.rpc(
+        'email_exists',
+        params: {'p_email': _email.text.trim()},
+      );
+      if (exists == false) {
         return 'No existe ninguna cuenta con ese correo en la app. '
             'Toca "Regístrate" para crear una.';
-      }
-      if (!methods.contains('password') && methods.contains('google.com')) {
-        return 'Ese correo se registró con Google. '
-            'Usa el botón "Continuar con Google".';
       }
       return 'Contraseña incorrecta.';
     } catch (_) {
       return fallback;
-    }
-  }
-
-  Future<void> _google() async {
-    if (!await requireOnline(context, 'entrar con Google')) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final provider = GoogleAuthProvider()
-        ..addScope('email')
-        ..addScope('profile');
-      if (kIsWeb) {
-        await FirebaseAuth.instance.signInWithPopup(provider);
-      } else {
-        await FirebaseAuth.instance.signInWithProvider(provider);
-      }
-    } on FirebaseAuthException catch (e) {
-      if (e.code != 'popup-closed-by-user' &&
-          e.code != 'cancelled-popup-request' &&
-          e.code != 'canceled' &&
-          mounted) {
-        setState(() => _error = e.code == 'operation-not-allowed'
-            ? 'El acceso con Google aún no está activado en Firebase.'
-            : _message(e.code, e.message));
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = 'No se pudo entrar con Google: $e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -170,34 +138,36 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     try {
-      await FirebaseAuth.instance
-          .sendPasswordResetEmail(email: _email.text.trim());
+      await sb.auth.resetPasswordForEmail(_email.text.trim());
       setState(() => _error = 'Te enviamos un correo para restablecerla.');
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _message(e.code, e.message));
+    } on AuthException catch (e) {
+      setState(() => _error = _message((e.code ?? e.message).toString(), e.message));
     }
   }
 
   String _message(String code, [String? detail]) {
-    switch (code) {
-      case 'invalid-email':
-        return 'Correo no válido.';
-      case 'user-not-found':
-      case 'wrong-password':
-      case 'invalid-credential':
-        return 'Correo o contraseña incorrectos.';
-      case 'email-already-in-use':
-        return 'Ese correo ya está registrado.';
-      case 'weak-password':
-        return 'Contraseña muy débil. Usa al menos 8 caracteres.';
-      case 'too-many-requests':
-        return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
-      case 'network-request-failed':
-        return 'Sin conexión a internet.';
-      default:
-        return 'No se pudo continuar ($code)'
-            '${detail == null || detail.isEmpty ? '' : ': $detail'}';
+    final c = code.toLowerCase();
+    if (c.contains('invalid_credentials') || c.contains('invalid login')) {
+      return 'Correo o contraseña incorrectos.';
     }
+    if (c.contains('invalid') && c.contains('email')) return 'Correo no válido.';
+    if (c.contains('already') || c.contains('exists')) {
+      return 'Ese correo ya está registrado.';
+    }
+    if (c.contains('weak') || c.contains('password')) {
+      return 'Contraseña muy débil. Usa al menos 8 caracteres.';
+    }
+    if (c.contains('not_confirmed') || c.contains('not confirmed')) {
+      return 'Debes confirmar tu correo. Revisa tu bandeja.';
+    }
+    if (c.contains('rate') || c.contains('too_many')) {
+      return 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.';
+    }
+    if (c.contains('network') || c.contains('socket') || c.contains('failed host')) {
+      return 'Sin conexión a internet.';
+    }
+    return 'No se pudo continuar'
+        '${detail == null || detail.isEmpty ? '' : ': $detail'}';
   }
 
   void _openTerms() {
@@ -310,21 +280,6 @@ class _AuthScreenState extends State<AuthScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(_register ? 'Crear cuenta' : 'Iniciar sesión'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _busy ? null : _google,
-                      icon: const Text(
-                        'G',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      label: const Text('Continuar con Google'),
                     ),
                   ),
                   TextButton(

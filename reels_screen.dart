@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -23,15 +22,15 @@ class ReelsScreen extends StatefulWidget {
 }
 
 class _ReelsScreenState extends State<ReelsScreen> {
-  late final Stream<QuerySnapshot<Json>> _stream =
-      Db.posts.orderBy('createdAt', descending: true).limit(100).snapshots();
+  late final Stream<Snap> _stream =
+      Db.watchPosts();
   int _page = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: StreamBuilder<QuerySnapshot<Json>>(
+      body: StreamBuilder<Snap>(
         stream: _stream,
         builder: (context, snap) {
           if (snap.hasError) {
@@ -79,7 +78,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
 }
 
 class _ReelPage extends StatefulWidget {
-  final DocumentSnapshot<Json> doc;
+  final Doc doc;
   final bool active;
   const _ReelPage({super.key, required this.doc, required this.active});
 
@@ -381,15 +380,15 @@ class _Action extends StatelessWidget {
 }
 
 String _dateTime(dynamic ts) {
-  if (ts is! Timestamp) return '-';
-  final d = ts.toDate();
+  if (ts is! DateTime) return '-';
+  final d = ts;
   final hh = d.hour.toString().padLeft(2, '0');
   final mi = d.minute.toString().padLeft(2, '0');
   return '${formatFullDate(ts)}  $hh:$mi';
 }
 
 /// Información del reel: descripción, fecha, visitas, me gusta y reacciones.
-Future<void> _showInfo(BuildContext context, DocumentSnapshot<Json> doc) {
+Future<void> _showInfo(BuildContext context, Doc doc) {
   final d = doc.data() ?? <String, dynamic>{};
   final desc = ((d['description'] ?? '') as String).trim();
   final text = ((d['text'] ?? '') as String).trim();

@@ -1,12 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 String formatDate(dynamic ts) {
-  if (ts is! Timestamp) return 'ahora';
-  final d = ts.toDate();
+  if (ts is! DateTime) return 'ahora';
+  final d = ts;
   final diff = DateTime.now().difference(d);
   if (diff.inMinutes < 1) return 'ahora';
   if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
@@ -40,8 +39,8 @@ void toast(BuildContext context, String msg) {
 
 /// Fecha completa dd/mm/aaaa (para el panel de admin).
 String formatFullDate(dynamic ts) {
-  if (ts is! Timestamp) return '-';
-  final d = ts.toDate();
+  if (ts is! DateTime) return '-';
+  final d = ts;
   final dd = d.day.toString().padLeft(2, '0');
   final mm = d.month.toString().padLeft(2, '0');
   return '$dd/$mm/${d.year}';

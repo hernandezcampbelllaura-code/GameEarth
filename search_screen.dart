@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -22,7 +21,7 @@ class _SearchScreenState extends State<SearchScreen> {
   int _token = 0;
   bool _loading = false;
   String _query = '';
-  List<QueryDocumentSnapshot<Json>> _results = [];
+  List<Doc> _results = [];
   String? _error;
 
   @override
@@ -55,13 +54,9 @@ class _SearchScreenState extends State<SearchScreen> {
       _error = null;
     });
     try {
-      final snap = await Db.users
-          .where('usernameLower', isGreaterThanOrEqualTo: q)
-          .where('usernameLower', isLessThan: '$q')
-          .limit(25)
-          .get();
+      final docs = await Db.searchUsers(q);
       if (!mounted || token != _token) return;
-      setState(() => _results = snap.docs);
+      setState(() => _results = docs);
     } catch (e) {
       if (!mounted || token != _token) return;
       setState(() => _error = 'No se pudo buscar: $e');

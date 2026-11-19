@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
@@ -19,28 +17,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final Stream<DocumentSnapshot<Json>> _user =
-      Db.users.doc(widget.uid).snapshots();
-  late final Stream<int> _followers = Db.users
-      .doc(widget.uid)
-      .collection('followers')
-      .snapshots()
-      .map((s) => s.size);
-  late final Stream<int> _followingCount = Db.users
-      .doc(widget.uid)
-      .collection('following')
-      .snapshots()
-      .map((s) => s.size);
-  late final Stream<QuerySnapshot<Json>> _posts =
-      Db.posts.where('authorId', isEqualTo: widget.uid).snapshots();
-  late final Stream<int> _postCount = Db.posts
-      .where('authorId', isEqualTo: widget.uid)
-      .snapshots()
-      .map((s) => s.size);
+  late final Stream<Doc> _user = Db.watchProfile(widget.uid);
+  late final Stream<int> _followers =
+      Db.watchFollowCount(widget.uid, followers: true);
+  late final Stream<int> _followingCount =
+      Db.watchFollowCount(widget.uid, followers: false);
+  late final Stream<Snap> _posts = Db.watchPosts(authorId: widget.uid);
+  late final Stream<int> _postCount =
+      Db.watchPosts(authorId: widget.uid).map((s) => s.docs.length);
 
   Future<void> _logout() async {
     final ok = await confirmDialog(context, '¿Cerrar sesión?');
-    if (ok) await FirebaseAuth.instance.signOut();
+    if (ok) await sb.auth.signOut();
   }
 
   Future<void> _edit(Json u) async {
@@ -195,7 +183,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  int _millis(dynamic ts) => ts is Timestamp
+  int _millis(dynamic ts) => ts is DateTime
       ? ts.millisecondsSinceEpoch
       : DateTime.now().millisecondsSinceEpoch;
 
@@ -218,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
         ],
       ),
-      body: StreamBuilder<DocumentSnapshot<Json>>(
+      body: StreamBuilder<Doc>(
         stream: _user,
         builder: (context, snap) {
           if (snap.hasError) return Center(child: Text('Error: ${snap.error}'));
@@ -368,7 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     )
                   else
-                    StreamBuilder<QuerySnapshot<Json>>(
+                    StreamBuilder<Snap>(
                       stream: _posts,
                       builder: (context, ps) {
                         if (ps.hasError) {
