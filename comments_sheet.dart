@@ -281,7 +281,7 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                         maxLength: 300,
                         maxLines: 1,
                         onSubmitted: (_) => _send(),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: _replyName.isEmpty
                               ? 'Escribe un comentario…'
                               : 'Escribe tu respuesta…',
