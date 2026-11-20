@@ -115,6 +115,7 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               ),
+              FollowChip(uid: authorId),
               const Spacer(),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../notifier.dart';
 import '../services/db.dart';
 import 'admin_screen.dart';
 import 'create_screen.dart';
@@ -39,6 +40,11 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     Session.i.start(widget.uid);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Notifier.start(context, widget.uid);
+      Updater.start(() => context);
+    });
     // Cada 30 minutos de uso se le pide a la persona calificar la app.
     _ratingTimer = Timer.periodic(const Duration(minutes: 30), (_) async {
       if (!mounted || _asking) return;
@@ -54,6 +60,8 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _ratingTimer?.cancel();
+    Notifier.stop();
+    Updater.stop();
     Session.i.stop();
     super.dispose();
   }

@@ -1,7 +1,9 @@
 name: Build Web (iPhone, Windows, Mac, Linux)
 
-# Se ejecuta a mano: pestaña Actions > "Build Web" > Run workflow.
+# Se ejecuta solo cada vez que cambias algo (y también a mano).
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -26,7 +28,7 @@ jobs:
           for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
           for f in comments_sheet feedback_prompt poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
-          for f in main config net safety theme util; do move "$f.dart" lib; done
+          for f in main config net notifier notify_stub notify_web safety theme util; do move "$f.dart" lib; done
           test -f lib/main.dart || { echo "Falta main.dart"; exit 1; }
 
       - uses: subosito/flutter-action@v2
@@ -89,7 +91,10 @@ jobs:
       - run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+        run: flutter build web --release --no-web-resources-cdn --pwa-strategy=none --dart-define=APP_VERSION=${{ github.sha }} --base-href "/${{ github.event.repository.name }}/"
+
+      - name: Version file
+        run: echo '{"v":"${{ github.sha }}"}' > build/web/version.json
 
       - uses: actions/upload-pages-artifact@v3
         with:

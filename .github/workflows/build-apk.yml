@@ -22,7 +22,7 @@ jobs:
           for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
           for f in comments_sheet feedback_prompt poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
-          for f in main config net safety theme util; do move "$f.dart" lib; done
+          for f in main config net notifier notify_stub notify_web safety theme util; do move "$f.dart" lib; done
           test -f lib/main.dart || { echo "Falta main.dart"; exit 1; }
           test -f pubspec.yaml || { echo "Falta pubspec.yaml"; exit 1; }
 
@@ -54,8 +54,16 @@ jobs:
               sed -i '0,/^android {/s//android {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }/' "$f"
             fi
           done
+          # Necesario para las notificaciones locales.
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/compileOptions {/compileOptions {\n        isCoreLibraryDesugaringEnabled = true/' android/app/build.gradle.kts
+            printf '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n' >> android/app/build.gradle.kts
+          elif [ -f android/app/build.gradle ]; then
+            sed -i 's/compileOptions {/compileOptions {\n        coreLibraryDesugaringEnabled true/' android/app/build.gradle
+            printf "\ndependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\n}\n" >> android/app/build.gradle
+          fi
           M=android/app/src/main/AndroidManifest.xml
-          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$M"
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application#' "$M"
           sed -i 's#android:label="[^"]*"#android:label="GamingSocial"#' "$M"
 
       - run: flutter pub get
@@ -72,7 +80,7 @@ jobs:
           fi
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=APP_VERSION=${{ github.sha }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -86,4 +94,4 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk GamingSocial.apk
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest GamingSocial.apk --title "GamingSocial (APK más reciente)" --notes "Descarga GamingSocial.apk e instálala." 
+          gh release create apk-latest GamingSocial.apk --title "GamingSocial (APK más reciente)" --notes "Descarga GamingSocial.apk e instálala. version:${{ github.sha }}"

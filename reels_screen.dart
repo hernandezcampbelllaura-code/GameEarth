@@ -272,6 +272,7 @@ class _ReelPageState extends State<_ReelPage> {
                         shadows: [Shadow(blurRadius: 6)],
                       ),
                     ),
+                    FollowChip(uid: authorId),
                   ],
                 ),
               ),
