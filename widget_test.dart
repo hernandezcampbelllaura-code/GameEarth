@@ -31,7 +31,7 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(const MaterialApp(home: HelpScreen()));
     expect(find.text('¿Cómo inicio sesión?'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'contraseña');
+    await tester.enterText(find.byType(TextField), 'Olvidé');
     await tester.pump();
     expect(find.text('Olvidé mi contraseña'), findsOneWidget);
     expect(find.text('¿Cómo inicio sesión?'), findsNothing);
