@@ -10,6 +10,7 @@ import 'feed_screen.dart';
 import '../widgets/feedback_prompt.dart';
 import 'groups_screen.dart';
 import 'profile_screen.dart';
+import 'post_screen.dart';
 import 'reels_screen.dart';
 
 class _Dest {
@@ -44,6 +45,13 @@ class _HomeShellState extends State<HomeShell> {
       if (!mounted) return;
       Notifier.start(context, widget.uid);
       Updater.start(() => context);
+      // Si entró por el enlace de una publicación compartida, se abre.
+      final pid = Uri.base.queryParameters['post'];
+      if (pid != null && pid.isNotEmpty) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PostScreen(postId: pid)),
+        );
+      }
     });
     // Cada 30 minutos de uso se le pide a la persona calificar la app.
     _ratingTimer = Timer.periodic(const Duration(minutes: 30), (_) async {

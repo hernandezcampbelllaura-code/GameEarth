@@ -128,23 +128,9 @@ class _CommentsSheetState extends State<_CommentsSheet> {
                           child: Text('Sé el primero en comentar.'),
                         );
                       }
-                      // Comentarios principales y, debajo de cada uno, sus respuestas.
-                      final ids = {for (final d in all) d.id};
+                      final docs = threadComments(all);
                       String parentOf(Doc d) =>
                           ((d.data()['parentId'] ?? '') as String);
-                      final roots = all
-                          .where((d) =>
-                              parentOf(d).isEmpty || !ids.contains(parentOf(d)))
-                          .toList();
-                      final rows =
-                          <MapEntry<Doc, bool>>[];
-                      for (final r in roots) {
-                        rows.add(MapEntry(r, false));
-                        for (final x in all) {
-                          if (parentOf(x) == r.id) rows.add(MapEntry(x, true));
-                        }
-                      }
-                      final docs = rows;
                       return ListView.builder(
                         itemCount: docs.length,
                         itemBuilder: (_, i) {

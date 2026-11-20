@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'config.dart';
 
 String formatDate(dynamic ts) {
   if (ts is! DateTime) return 'ahora';
@@ -91,21 +92,12 @@ Future<void> openLink(BuildContext context, String url) async {
 }
 
 /// Abre el menú de compartir del teléfono (WhatsApp, etc.).
-Future<void> sharePost({
-  required String author,
-  required String text,
-  String imageUrl = '',
-  String videoUrl = '',
-  String linkUrl = '',
-}) async {
-  final parts = <String>[
-    '@$author en GamingSocial:',
-    if (text.isNotEmpty) text,
-    if (videoUrl.isNotEmpty) videoUrl,
-    if (imageUrl.isNotEmpty) imageUrl,
-    if (linkUrl.isNotEmpty) linkUrl,
-  ];
-  await Share.share(parts.join('\n'));
+/// Enlace que abre una publicación en la versión web.
+String postLink(String postId) => '$kWebUrl?post=$postId';
+
+/// Comparte el enlace de la publicación (no su texto).
+Future<void> sharePost({required String postId}) async {
+  await Share.share(postLink(postId));
 }
 
 /// Correo de contacto: lo ve cualquier persona que use la app.

@@ -116,3 +116,45 @@ class ReactionBuilder extends StatelessWidget {
     );
   }
 }
+
+/// Reacciones con al menos una persona, de la más usada a la menos usada.
+List<MapEntry<String, int>> sortedReactions(dynamic counts) {
+  if (counts is! Map) return [];
+  final out = <MapEntry<String, int>>[];
+  for (final r in kReactions) {
+    final n = counts[r[0]];
+    if (n is num && n > 0) out.add(MapEntry(r[0], n.toInt()));
+  }
+  out.sort((a, b) => b.value.compareTo(a.value));
+  return out;
+}
+
+/// Fila con la cantidad de cada reacción: ❤️ 3  👍 2  😮 1
+class ReactionSummary extends StatelessWidget {
+  final dynamic counts;
+  const ReactionSummary({super.key, required this.counts});
+
+  @override
+  Widget build(BuildContext context) {
+    final list = sortedReactions(counts);
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 12,
+      runSpacing: 2,
+      children: [
+        for (final e in list)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(reactionEmoji(e.key), style: const TextStyle(fontSize: 15)),
+              const SizedBox(width: 3),
+              Text(
+                '${e.value}',
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}

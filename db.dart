@@ -59,6 +59,26 @@ Doc _toDoc(Json row, String Function(Json)? idOf) {
   return Doc(id, out);
 }
 
+/// Convierte una fila de la base de datos en un [Doc] (usado también en pruebas).
+Doc docFromRow(Json row, {String Function(Json)? idOf}) => _toDoc(row, idOf);
+
+/// Ordena comentarios: cada principal seguido de sus respuestas. Una respuesta
+/// cuyo comentario original ya no existe se muestra como principal.
+List<MapEntry<Doc, bool>> threadComments(List<Doc> all) {
+  String parentOf(Doc d) => (d.data()['parentId'] ?? '').toString();
+  final ids = {for (final d in all) d.id};
+  final rows = <MapEntry<Doc, bool>>[];
+  for (final r in all) {
+    final p = parentOf(r);
+    if (p.isNotEmpty && ids.contains(p)) continue;
+    rows.add(MapEntry(r, false));
+    for (final x in all) {
+      if (parentOf(x) == r.id) rows.add(MapEntry(x, true));
+    }
+  }
+  return rows;
+}
+
 int _watchCounter = 0;
 
 /// Convierte una consulta en un flujo que se actualiza solo: escucha los
@@ -251,6 +271,11 @@ class Db {
   }
 
   static void forgetProfile(String uid) => _profiles.remove(uid);
+
+  static Future<Doc?> postById(String id) async {
+    final r = await sb.from('posts').select().eq('id', id).maybeSingle();
+    return r == null ? null : _toDoc(Map<String, dynamic>.from(r), null);
+  }
 
   static Future<String> userEmail(String uid) async {
     final r = await sb.from('user_private').select('email').eq('id', uid).maybeSingle();

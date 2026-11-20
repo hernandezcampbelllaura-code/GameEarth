@@ -6,6 +6,9 @@ class SupabaseConfig {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ2t3d3JiZnhkYmNuZXZxb3ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUxMjE1ODMsImV4cCI6MjExMDY5NzU4M30.pHSNrtbIgjE_L3XFB4x9VoUrd26PUrgDp_XsUQI1v5E';
 }
 
+/// Dirección de la versión web (los enlaces compartidos apuntan aquí).
+const String kWebUrl = 'https://hernandezcampbelllaura-code.github.io/GameEarth/';
+
 /// Datos de Cloudinary: el almacén gratuito donde se guardan las fotos y los
 /// videos que la gente sube desde su galería. Ninguno de los dos es secreto.
 class MediaConfig {

@@ -324,12 +324,7 @@ class _ReelPageState extends State<_ReelPage> {
               _Action(
                 icon: Icons.share_outlined,
                 label: 'Compartir',
-                onTap: () => sharePost(
-                  author: author,
-                  text: text,
-                  videoUrl: video,
-                  linkUrl: link,
-                ),
+                onTap: () => sharePost(postId: widget.doc.id),
               ),
             ],
           ),

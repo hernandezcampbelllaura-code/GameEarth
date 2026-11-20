@@ -201,6 +201,11 @@ class PostCard extends StatelessWidget {
                 ),
               ),
             ),
+          if (likes > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 2),
+              child: ReactionSummary(counts: d['reactionCounts']),
+            ),
           Row(
             children: [
               ReactionBuilder(
@@ -248,13 +253,7 @@ class PostCard extends StatelessWidget {
                 ),
               ),
               TextButton.icon(
-                onPressed: () => sharePost(
-                  author: author,
-                  text: text,
-                  imageUrl: img,
-                  videoUrl: video,
-                  linkUrl: link,
-                ),
+                onPressed: () => sharePost(postId: doc.id),
                 icon: const Icon(Icons.share_outlined, color: Colors.white70),
                 label: const Text(
                   'Compartir',

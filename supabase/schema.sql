@@ -518,3 +518,6 @@ alter publication supabase_realtime add table
   public.posts, public.comments, public.likes, public.votes, public.profiles,
   public.follows, public.blocks, public.groups, public.group_members,
   public.chats, public.messages, public.reports, public.feedback, public.admins;
+
+-- Conteo por tipo de reacción (migración reaction_counts)
+alter table public.posts add column if not exists reaction_counts jsonb not null default '{}';

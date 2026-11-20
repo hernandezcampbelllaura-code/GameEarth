@@ -1,0 +1,50 @@
+name: Tests
+
+# Se ejecuta antes de cada despliegue (lo llaman los otros flujos) y también a mano.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Arrange files
+        run: |
+          mkdir -p lib/screens lib/services lib/widgets
+          move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
+          for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen home_shell profile_screen post_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
+          move db.dart lib/services
+          for f in comments_sheet feedback_prompt poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
+          for f in main config net notifier notify_stub notify_web safety theme util; do move "$f.dart" lib; done
+          mkdir -p "$RUNNER_TEMP/tests"
+          for f in unit_test widget_test integration_test; do move "$f.dart" "$RUNNER_TEMP/tests"; done
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate project and restore sources
+        run: |
+          cp -r lib "$RUNNER_TEMP/lib_bak"
+          cp pubspec.yaml "$RUNNER_TEMP/pubspec_bak.yaml"
+          flutter create --platforms=web --org com.gamingsocial --project-name gamingsocial .
+          rm -rf lib test
+          cp -r "$RUNNER_TEMP/lib_bak" lib
+          cp "$RUNNER_TEMP/pubspec_bak.yaml" pubspec.yaml
+          mkdir -p test
+          cp "$RUNNER_TEMP"/tests/*.dart test/
+
+      - run: flutter pub get
+
+      - name: Unit and widget tests
+        run: flutter test test/unit_test.dart test/widget_test.dart
+
+      - name: Integration tests (server)
+        run: flutter test test/integration_test.dart
