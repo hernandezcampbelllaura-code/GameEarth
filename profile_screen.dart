@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
+import '../widgets/photo_editor.dart';
 import 'chats_screen.dart';
 import '../util.dart';
 import '../widgets/post_card.dart';
@@ -62,7 +63,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ? null
                       : () async {
                           try {
-                            final m = await Media.pickImage(maxWidth: 700);
+                            final m = await pickPhotoWithEditor(
+                              context,
+                              circle: true,
+                              maxWidth: 700,
+                            );
                             if (m == null) return;
                             setD(() {
                               uploading = true;
@@ -88,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         )
                       : const Icon(Icons.photo_library_outlined),
                   label: Text(
-                    uploading ? 'Subiendo…' : 'Elegir foto de la galería',
+                    uploading ? 'Subiendo…' : 'Cambiar foto',
                   ),
                 ),
                 if (error != null)

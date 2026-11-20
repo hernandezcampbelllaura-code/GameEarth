@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart' show ImageSource;
 
 import '../net.dart';
 import '../safety.dart';
 import '../services/db.dart';
+import '../widgets/photo_editor.dart';
 import '../util.dart';
 
 class CreateScreen extends StatefulWidget {
-  final VoidCallback onDone;
+  /// Se llama al publicar, con el id de la publicación y si es un video.
+  final void Function(String postId, bool isVideo) onDone;
   final String groupId; // '' = publicación normal
   const CreateScreen({super.key, required this.onDone, this.groupId = ''});
 
@@ -40,7 +43,33 @@ class _CreateScreenState extends State<CreateScreen> {
 
   Future<void> _pick(bool video) async {
     try {
-      final m = video ? await Media.pickVideo() : await Media.pickImage();
+      PickedMedia? m;
+      if (video) {
+        final src = await showModalBottomSheet<ImageSource>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.videocam),
+                  title: const Text('Grabar video con la cámara'),
+                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.video_library),
+                  title: const Text('Elegir de la galería'),
+                  onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (src == null) return;
+        m = await Media.pickVideo(source: src);
+      } else {
+        m = await pickPhotoWithEditor(context);
+      }
       if (m != null && mounted) setState(() => _media = m);
     } catch (e) {
       if (mounted) toast(context, '$e');
@@ -89,7 +118,7 @@ class _CreateScreenState extends State<CreateScreen> {
           image = url;
         }
       }
-      await Db.createPost(
+      final newId = await Db.createPost(
         text,
         image,
         videoUrl: video,
@@ -108,7 +137,7 @@ class _CreateScreenState extends State<CreateScreen> {
       if (mounted) {
         setState(() => _media = null);
         toast(context, 'Publicado');
-        widget.onDone();
+        widget.onDone(newId, m != null && m.isVideo);
       }
     } catch (e) {
       if (mounted) toast(context, 'No se pudo publicar: $e');

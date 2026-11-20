@@ -89,7 +89,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                         MaterialPageRoute(
                           builder: (ctx) => CreateScreen(
                             groupId: widget.groupId,
-                            onDone: () => Navigator.pop(ctx),
+                            onDone: (_, __) => Navigator.pop(ctx),
                           ),
                         ),
                       ),

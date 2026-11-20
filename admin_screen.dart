@@ -270,10 +270,13 @@ class _AdminScreenState extends State<AdminScreen> {
         if (docs.isEmpty) {
           return const Center(child: Text('Aún no hay opiniones.'));
         }
-        final avg = docs
+        final rated = docs.where((d) => d.data()['kind'] != 'question').toList();
+        final avg = rated.isEmpty
+            ? 0.0
+            : rated
                 .map((d) => ((d.data()['stars'] ?? 0) as num).toDouble())
                 .fold<double>(0, (a, b) => a + b) /
-            docs.length;
+            rated.length;
         return Column(
           children: [
             Padding(
@@ -281,7 +284,7 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Promedio: ${avg.toStringAsFixed(1)} ★  ·  ${docs.length} opiniones',
+                  'Promedio: ${avg.toStringAsFixed(1)} ★  ·  ${rated.length} opiniones · ${docs.length - rated.length} preguntas',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ),
@@ -296,7 +299,9 @@ class _AdminScreenState extends State<AdminScreen> {
                   return ListTile(
                     isThreeLine: true,
                     title: Text(
-                      '${'★' * stars}${'☆' * (5 - stars)}   @${f['username'] ?? ''}',
+                      f['kind'] == 'question'
+                          ? '❓ Pregunta   @${f['username'] ?? ''}'
+                          : '${'★' * stars}${'☆' * (5 - stars)}   @${f['username'] ?? ''}',
                       style: const TextStyle(color: Colors.amber),
                     ),
                     subtitle: Text(

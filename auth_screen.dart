@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'help_screen.dart';
 
 import '../net.dart';
 import '../safety.dart';
@@ -298,6 +299,14 @@ class _AuthScreenState extends State<AuthScreen> {
                       onPressed: _reset,
                       child: const Text('Olvidé mi contraseña'),
                     ),
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HelpScreen()),
+                    ),
+                    icon: const Icon(Icons.help_outline),
+                    label: const Text('Ayuda y preguntas frecuentes'),
+                  ),
                   TextButton(
                     onPressed: () => showContactDialog(context),
                     child: const Text('¿No estás de acuerdo con algo? Escríbenos'),

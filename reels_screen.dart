@@ -48,6 +48,9 @@ class _ReelsScreenState extends State<ReelsScreen> {
                     ((m['groupId'] ?? '') as String).isEmpty &&
                     !blocked.contains(m['authorId']);
               }).toList();
+              final first = Session.i.focusReel.value;
+              final at = first == null ? -1 : reels.indexWhere((d) => d.id == first);
+              if (at > 0) reels.insert(0, reels.removeAt(at));
               if (reels.isEmpty) {
                 return const Center(
                   child: Padding(
@@ -60,6 +63,7 @@ class _ReelsScreenState extends State<ReelsScreen> {
                 );
               }
               return PageView.builder(
+                key: ValueKey('reels-${first ?? ''}'),
                 scrollDirection: Axis.vertical,
                 itemCount: reels.length,
                 onPageChanged: (i) => setState(() => _page = i),

@@ -521,3 +521,8 @@ alter publication supabase_realtime add table
 
 -- Conteo por tipo de reacción (migración reaction_counts)
 alter table public.posts add column if not exists reaction_counts jsonb not null default '{}';
+
+-- Preguntas de ayuda (migración feedback_questions)
+alter table public.feedback add column if not exists kind text not null default 'rating' check (kind in ('rating','question'));
+alter table public.feedback drop constraint if exists feedback_stars_check;
+alter table public.feedback add constraint feedback_stars_check check (stars between 0 and 5 and ((kind='rating' and stars>=1) or (kind='question' and stars=0)));

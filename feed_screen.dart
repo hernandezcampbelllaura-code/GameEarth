@@ -4,6 +4,7 @@ import '../net.dart';
 import '../services/db.dart';
 import '../widgets/post_card.dart';
 import 'chats_screen.dart';
+import 'help_screen.dart';
 import 'search_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -50,6 +51,14 @@ class _FeedScreenState extends State<FeedScreen> {
             ],
           ),
           actions: [
+            IconButton(
+              tooltip: 'Ayuda y preguntas',
+              icon: const Icon(Icons.help_outline),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HelpScreen()),
+              ),
+            ),
             IconButton(
               tooltip: 'Buscar jugadores',
               icon: const Icon(Icons.search),

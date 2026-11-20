@@ -284,7 +284,8 @@ class Db {
 
   // ---------- Publicaciones ----------
 
-  static Future<void> createPost(
+  /// Publica y devuelve el id de la nueva publicación.
+  static Future<String> createPost(
     String text,
     String imageUrl, {
     String videoUrl = '',
@@ -293,7 +294,7 @@ class Db {
     String description = '',
     List<String> pollOptions = const [],
   }) async {
-    await sb.from('posts').insert({
+    final row = await sb.from('posts').insert({
       'text': text,
       'image_url': imageUrl,
       'video_url': videoUrl,
@@ -301,7 +302,8 @@ class Db {
       'group_id': groupId,
       'description': description,
       'poll_options': pollOptions,
-    });
+    }).select('id').single();
+    return row['id'].toString();
   }
 
   /// Reacciona a una publicación. Si ya tenías esa misma reacción, la quita;
@@ -345,6 +347,16 @@ class Db {
 
   /// Guarda la opinión (estrellas + motivo) y, si está configurado, la manda
   /// también al correo por medio de Formspree.
+  /// Pregunta de ayuda que llega al panel de administración.
+  static Future<void> askQuestion(String text) async {
+    await sb.from('feedback').insert({
+      'stars': 0,
+      'kind': 'question',
+      'reason': text,
+      'platform': kIsWeb ? 'web' : 'android',
+    });
+  }
+
   static Future<void> sendFeedback(int stars, String reason) async {
     final name = Session.i.username;
     await sb.from('feedback').insert({
@@ -531,6 +543,8 @@ class Session {
       ValueNotifier<Map<String, String>>({});
   final ValueNotifier<Map<String, int>> myVotes = ValueNotifier<Map<String, int>>({});
   String username = '';
+  /// Reel recién publicado: aparece de primero en la pestaña Reels.
+  final ValueNotifier<String?> focusReel = ValueNotifier<String?>(null);
 
   final List<StreamSubscription<dynamic>> _subs = [];
 
@@ -606,6 +620,10 @@ class PickedMedia {
   final bool isVideo;
   PickedMedia(this.file, this.isVideo);
 
+  /// Foto ya editada (por ejemplo recortada) que está en memoria.
+  factory PickedMedia.fromBytes(Uint8List data, String name) =>
+      PickedMedia(XFile.fromData(data, name: name, mimeType: 'image/png'), false);
+
   String get path => file.path;
 
   /// Bytes del archivo (sirve en Android, iPhone y web). Se leen una sola vez.
@@ -621,17 +639,25 @@ class Media {
 
   static const int _maxVideoBytes = 90 * 1024 * 1024;
 
-  static Future<PickedMedia?> pickImage({double maxWidth = 1600}) async {
+  static Future<PickedMedia?> pickImage({
+    double maxWidth = 1600,
+    ImageSource source = ImageSource.gallery,
+  }) async {
     final f = await _picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       maxWidth: maxWidth,
       imageQuality: 80,
     );
     return f == null ? null : PickedMedia(f, false);
   }
 
-  static Future<PickedMedia?> pickVideo() async {
-    final f = await _picker.pickVideo(source: ImageSource.gallery);
+  static Future<PickedMedia?> pickVideo({
+    ImageSource source = ImageSource.gallery,
+  }) async {
+    final f = await _picker.pickVideo(
+      source: source,
+      maxDuration: const Duration(minutes: 3),
+    );
     if (f == null) return null;
     final size = await f.length();
     if (size > _maxVideoBytes) {

@@ -91,7 +91,20 @@ class _HomeShellState extends State<HomeShell> {
             'Crear',
             Icons.add_circle_outline,
             Icons.add_circle,
-            CreateScreen(onDone: () => setState(() => _index = 0)),
+            CreateScreen(
+              onDone: (id, isVideo) {
+                if (isVideo) {
+                  // Tu reel aparece de primero en Reels.
+                  Session.i.focusReel.value = id;
+                  setState(() => _index = 1);
+                } else {
+                  setState(() => _index = 0);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => PostScreen(postId: id)),
+                  );
+                }
+              },
+            ),
           ),
           const _Dest('Grupos', Icons.groups_outlined, Icons.groups, GroupsScreen()),
           _Dest(
