@@ -83,6 +83,19 @@ jobs:
             echo "No hay app_icon.png, se usa el ícono por defecto"
           fi
 
+      # Firma fija: así cada versión nueva se instala encima de la anterior.
+      - name: Use fixed signing key
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            mkdir -p ~/.android
+            echo "$KS" | base64 -d > ~/.android/debug.keystore
+            echo "Firma fija activada"
+          else
+            echo "::warning::Falta el secreto ANDROID_KEYSTORE_B64: la firma cambia en cada compilación y no se podrá actualizar sin desinstalar."
+          fi
+
       - name: Build release APK
         run: flutter build apk --release --dart-define=APP_VERSION=${{ github.sha }}
 
