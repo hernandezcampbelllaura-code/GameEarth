@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir -p lib/screens lib/services lib/widgets
           move() { if [ -f "$1" ]; then mv "$1" "$2/"; fi; }
-          for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen help_screen home_shell profile_screen post_screen profile_setup_screen reels_screen search_screen; do move "$f.dart" lib/screens; done
+          for f in admin_screen auth_screen banned_screen chats_screen create_screen feed_screen group_detail_screen groups_screen help_screen home_shell profile_screen post_screen profile_setup_screen reels_screen search_screen settings_screen; do move "$f.dart" lib/screens; done
           move db.dart lib/services
           for f in comments_sheet feedback_prompt photo_editor poll_block post_card reactions report_dialog user_avatar; do move "$f.dart" lib/widgets; done
           for f in main config net notifier notify_stub notify_web safety theme util; do move "$f.dart" lib; done

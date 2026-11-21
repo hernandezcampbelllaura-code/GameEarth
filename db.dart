@@ -158,10 +158,19 @@ class Db {
 
   // ---------- Lecturas en vivo ----------
 
-  static Stream<Snap> watchPosts({String? authorId, String? groupId, int limit = 100}) {
+  static Stream<Snap> watchPosts({
+    String? authorId,
+    String? groupId,
+    int limit = 100,
+    bool includeCollab = false,
+  }) {
     return watchQuery('posts', () {
       var q = sb.from('posts').select();
-      if (authorId != null) q = q.eq('author_id', authorId);
+      if (authorId != null && includeCollab) {
+        q = q.or('author_id.eq.$authorId,collab_id.eq.$authorId');
+      } else if (authorId != null) {
+        q = q.eq('author_id', authorId);
+      }
       if (groupId != null) q = q.eq('group_id', groupId);
       return q.order('created_at', ascending: false).limit(limit);
     });
@@ -311,6 +320,7 @@ class Db {
     String groupId = '',
     String description = '',
     List<String> pollOptions = const [],
+    String collabId = '',
   }) async {
     final row = await sb.from('posts').insert({
       'text': text,
@@ -320,6 +330,7 @@ class Db {
       'group_id': groupId,
       'description': description,
       'poll_options': pollOptions,
+      if (collabId.isNotEmpty) 'collab_id': collabId,
     }).select('id').single();
     return row['id'].toString();
   }
@@ -365,6 +376,95 @@ class Db {
 
   /// Guarda la opinión (estrellas + motivo) y, si está configurado, la manda
   /// también al correo por medio de Formspree.
+  static Future<void> editPost(
+    String id,
+    String text,
+    String description,
+    String link,
+  ) =>
+      sb.rpc('edit_post', params: {
+        'p_post': id,
+        'p_text': text,
+        'p_description': description,
+        'p_link': link,
+      });
+
+  static Future<void> leaveCollab(String id) =>
+      sb.rpc('leave_collab', params: {'p_post': id});
+
+  /// Todas mis publicaciones (para estadísticas).
+  static Future<List<Doc>> myPosts() async {
+    final rows = await sb
+        .from('posts')
+        .select()
+        .eq('author_id', myUid)
+        .order('created_at', ascending: false)
+        .limit(500);
+    return [for (final r in rows) _toDoc(Map<String, dynamic>.from(r), null)];
+  }
+
+  static Future<DateTime?> myBirthday() async {
+    final r = await sb.from('user_private').select('birthday').eq('id', myUid).maybeSingle();
+    final b = r?['birthday'];
+    return b is String ? DateTime.tryParse(b) : null;
+  }
+
+  static Future<void> setBirthday(DateTime? d, bool show) => sb.rpc(
+        'set_birthday',
+        params: {
+          'p_date': d == null ? null : d.toIso8601String().substring(0, 10),
+          'p_show': show,
+        },
+      );
+
+  /// Solicitud de verificación. Si hay un formulario de correo configurado,
+  /// también se envía un aviso al correo de la administradora.
+  static Future<void> requestVerification(String note) async {
+    await sb.rpc('request_verification', params: {'p_note': note});
+    final url = FeedbackConfig.emailFormUrl;
+    if (url.isEmpty) return;
+    try {
+      await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            body: jsonEncode({
+              'asunto': 'Solicitud de verificación en GamingSocial',
+              'usuario': Session.i.username,
+              'nota': note,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
+  static Stream<Snap> watchMyVerification() => watchQuery(
+        'verification_requests',
+        () => sb
+            .from('verification_requests')
+            .select()
+            .eq('user_id', myUid)
+            .order('created_at', ascending: false)
+            .limit(1),
+      );
+
+  static Stream<Snap> watchVerifications() => watchQuery(
+        'verification_requests',
+        () => sb
+            .from('verification_requests')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(100),
+      );
+
+  static Future<void> reviewVerification(String id, bool approve) =>
+      sb.rpc('admin_review_verification', params: {'p_request': id, 'p_approve': approve});
+
+  static Future<void> setVerified(String uid, bool v) {
+    forgetProfile(uid);
+    return sb.rpc('admin_set_verified', params: {'p_user': uid, 'p_verified': v});
+  }
+
   /// Pregunta de ayuda que llega al panel de administración.
   static Future<void> askQuestion(String text) async {
     await sb.from('feedback').insert({

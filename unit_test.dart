@@ -4,6 +4,7 @@ import 'package:gamingsocial/util.dart';
 import 'package:gamingsocial/config.dart';
 import 'package:gamingsocial/services/db.dart';
 import 'package:gamingsocial/widgets/reactions.dart';
+import 'package:gamingsocial/screens/settings_screen.dart';
 
 void main() {
   group('Safety.isBad (filtro de palabras)', () {
@@ -105,6 +106,22 @@ void main() {
       expect(sortedReactions(null), isEmpty);
       expect(sortedReactions('x'), isEmpty);
       expect(sortedReactions({}), isEmpty);
+    });
+  });
+
+  group('estadísticas', () {
+    test('suma vistas, reacciones y comentarios', () {
+      final t = statsTotals([
+        docFromRow({'id': '1', 'views': 10, 'likes_count': 2, 'comments_count': 1}),
+        docFromRow({'id': '2', 'views': 5, 'likes_count': 3, 'comments_count': 0}),
+      ]);
+      expect(t['posts'], 2);
+      expect(t['views'], 15);
+      expect(t['likes'], 5);
+      expect(t['comments'], 1);
+    });
+    test('sin publicaciones todo es cero', () {
+      expect(statsTotals([])['views'], 0);
     });
   });
 }

@@ -78,3 +78,24 @@ class FollowChip extends StatelessWidget {
     );
   }
 }
+
+/// Insignia azul de cuenta verificada junto al nombre.
+class VerifiedBadge extends StatelessWidget {
+  final String uid;
+  final double size;
+  const VerifiedBadge({super.key, required this.uid, this.size = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Json?>(
+      future: Db.profileOf(uid),
+      builder: (context, s) {
+        if (s.data?['verified'] != true) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Icon(Icons.verified, size: size, color: Colors.lightBlueAccent),
+        );
+      },
+    );
+  }
+}

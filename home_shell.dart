@@ -43,8 +43,12 @@ class _HomeShellState extends State<HomeShell> {
     Session.i.start(widget.uid);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Notifier.start(context, widget.uid);
-      Updater.start(() => context);
+      // Lo no esencial arranca un momento después, para que la app abra rápido.
+      Future.delayed(const Duration(seconds: 3), () {
+        if (!mounted) return;
+        Notifier.start(context, widget.uid);
+        Updater.start(() => context);
+      });
       // Si entró por el enlace de una publicación compartida, se abre.
       final pid = Uri.base.queryParameters['post'];
       if (pid != null && pid.isNotEmpty) {

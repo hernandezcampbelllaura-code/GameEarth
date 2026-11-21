@@ -526,3 +526,7 @@ alter table public.posts add column if not exists reaction_counts jsonb not null
 alter table public.feedback add column if not exists kind text not null default 'rating' check (kind in ('rating','question'));
 alter table public.feedback drop constraint if exists feedback_stars_check;
 alter table public.feedback add constraint feedback_stars_check check (stars between 0 and 5 and ((kind='rating' and stars>=1) or (kind='question' and stars=0)));
+
+-- Migración settings_verified_collab_edit (aplicada en Supabase): profiles.verified, profiles.birthday_md,
+-- user_private.birthday, posts.edited_at/collab_id/collab_name, tabla verification_requests y funciones
+-- edit_post, leave_collab, set_birthday, request_verification, admin_review_verification, admin_set_verified.

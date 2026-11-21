@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../screens/profile_screen.dart';
+import '../net.dart';
+import '../safety.dart';
 import '../services/db.dart';
 import '../util.dart';
 import 'comments_sheet.dart';
@@ -45,6 +47,12 @@ class PostCard extends StatelessWidget {
           }
           break;
         }
+      case 'edit':
+        await _editDialog(context);
+        break;
+      case 'leavecollab':
+        await guard(context, () => Db.leaveCollab(doc.id));
+        break;
       case 'delete':
         {
           final ok = await confirmDialog(context, '¿Eliminar esta publicación?');
@@ -54,6 +62,72 @@ class PostCard extends StatelessWidget {
           break;
         }
     }
+  }
+
+  Future<void> _editDialog(BuildContext context) async {
+    final d = doc.data() ?? <String, dynamic>{};
+    final text = TextEditingController(text: (d['text'] ?? '') as String);
+    final desc = TextEditingController(text: (d['description'] ?? '') as String);
+    final link = TextEditingController(text: (d['linkUrl'] ?? '') as String);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar publicación'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: text,
+                maxLength: 500,
+                maxLines: 4,
+                decoration: const InputDecoration(labelText: 'Texto'),
+              ),
+              TextField(
+                controller: desc,
+                maxLength: 500,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Descripción'),
+              ),
+              TextField(
+                controller: link,
+                decoration: const InputDecoration(labelText: 'Enlace (opcional)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final t = text.text.trim();
+    if (t.isEmpty) {
+      toast(context, 'El texto no puede quedar vacío.');
+      return;
+    }
+    final rawLink = link.text.trim();
+    final cl = cleanUrl(rawLink);
+    if (rawLink.isNotEmpty && cl.isEmpty) {
+      toast(context, 'El enlace no es válido.');
+      return;
+    }
+    if (!await requireOnline(context, 'guardar los cambios')) return;
+    if (!context.mounted || !Safety.check(context, [t, desc.text, rawLink])) {
+      return;
+    }
+    await guard(context, () async {
+      await Db.editPost(doc.id, t, desc.text.trim(), cl);
+      if (context.mounted) toast(context, 'Cambios guardados');
+    });
   }
 
   @override
@@ -99,12 +173,28 @@ class PostCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '@$author',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '@$author',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            VerifiedBadge(uid: authorId),
+                            if (((d['collabName'] ?? '') as String).isNotEmpty)
+                              Text(
+                                '  con @${d['collabName']}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.lightBlueAccent,
+                                ),
+                              ),
+                          ],
                         ),
                         Text(
-                          formatDate(d['createdAt']),
+                          d['editedAt'] != null
+                              ? '${formatDate(d['createdAt'])} · editado'
+                              : formatDate(d['createdAt']),
                           style: const TextStyle(
                             fontSize: 12,
                             color: Colors.white54,
@@ -121,6 +211,13 @@ class PostCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert),
                 onSelected: (v) => _menu(context, v, authorId, author, text),
                 itemBuilder: (_) => [
+                  if (mine)
+                    const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                  if (d['collabId'] == myUid)
+                    const PopupMenuItem(
+                      value: 'leavecollab',
+                      child: Text('Quitarme como colaborador'),
+                    ),
                   if (!mine)
                     const PopupMenuItem(
                       value: 'report',
@@ -152,6 +249,7 @@ class PostCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
                   img,
+                  cacheWidth: 900,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   errorBuilder: (c, e, s) => const SizedBox.shrink(),

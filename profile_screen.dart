@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/db.dart';
+import 'settings_screen.dart';
 import '../widgets/photo_editor.dart';
 import 'chats_screen.dart';
 import '../util.dart';
@@ -23,9 +24,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Db.watchFollowCount(widget.uid, followers: true);
   late final Stream<int> _followingCount =
       Db.watchFollowCount(widget.uid, followers: false);
-  late final Stream<Snap> _posts = Db.watchPosts(authorId: widget.uid);
+  late final Stream<Snap> _posts =
+      Db.watchPosts(authorId: widget.uid, includeCollab: true);
   late final Stream<int> _postCount =
-      Db.watchPosts(authorId: widget.uid).map((s) => s.docs.length);
+      Db.watchPosts(authorId: widget.uid, includeCollab: true)
+          .map((s) => s.docs.length);
 
   Future<void> _logout() async {
     final ok = await confirmDialog(context, '¿Cerrar sesión?');
@@ -192,6 +195,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ? ts.millisecondsSinceEpoch
       : DateTime.now().millisecondsSinceEpoch;
 
+  static const _meses = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+    'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  ];
+
+  /// "MM-DD" -> "14 de marzo" (null si no hay cumpleaños público).
+  String? _birthdayText(String md) {
+    final p = md.split('-');
+    if (p.length != 2) return null;
+    final m = int.tryParse(p[0]);
+    final d = int.tryParse(p[1]);
+    if (m == null || d == null || m < 1 || m > 12) return null;
+    return '$d de ${_meses[m - 1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,6 +221,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () => showContactDialog(context),
             icon: const Icon(Icons.mail_outline),
           ),
+          if (widget.isMe)
+            IconButton(
+              tooltip: 'Configuración',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+              icon: const Icon(Icons.settings),
+            ),
           if (widget.isMe)
             IconButton(
               tooltip: 'Cerrar sesión',
@@ -241,13 +268,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         UserAvatar(uid: widget.uid, radius: 44),
                         const SizedBox(height: 10),
-                        Text(
-                          '@$name',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '@$name',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (u['verified'] == true)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 6),
+                                child: Icon(
+                                  Icons.verified,
+                                  size: 20,
+                                  color: Colors.lightBlueAccent,
+                                ),
+                              ),
+                          ],
                         ),
+                        if (_birthdayText((u['birthdayMd'] ?? '') as String) != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '🎂 ${_birthdayText((u['birthdayMd'] ?? '') as String)}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ),
                         if (bio.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 6),

@@ -261,6 +261,76 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  late final Stream<Snap> _verif = Db.watchVerifications();
+
+  Widget _verifTab() {
+    return StreamBuilder<Snap>(
+      stream: _verif,
+      builder: (context, snap) {
+        if (!snap.hasData) return _states(snap);
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Center(child: Text('Aún no hay solicitudes.'));
+        }
+        return ListView.separated(
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, i) {
+            final r = docs[i].data();
+            final status = (r['status'] ?? '') as String;
+            final uid = (r['userId'] ?? '') as String;
+            return ListTile(
+              isThreeLine: true,
+              title: Text('@${r['username'] ?? ''}'),
+              subtitle: Text(
+                '${r['views']} vistas · ${r['likes']} reacciones\n'
+                '${(r['note'] ?? '') == '' ? '(sin mensaje)' : r['note']}\n'
+                '${formatFullDate(r['createdAt'])} · '
+                '${status == 'pending' ? 'PENDIENTE' : status == 'approved' ? 'Verificado' : 'Rechazada'}',
+              ),
+              trailing: status == 'pending'
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Aprobar',
+                          icon: const Icon(Icons.check_circle, color: Colors.green),
+                          onPressed: () => guard(
+                            context,
+                            () => Db.reviewVerification(docs[i].id, true),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Rechazar',
+                          icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                          onPressed: () => guard(
+                            context,
+                            () => Db.reviewVerification(docs[i].id, false),
+                          ),
+                        ),
+                      ],
+                    )
+                  : status == 'approved'
+                      ? TextButton(
+                          onPressed: () async {
+                            final ok = await confirmDialog(
+                              context,
+                              '¿Quitar la verificación a @${r['username']}?',
+                            );
+                            if (ok && context.mounted) {
+                              await guard(context, () => Db.setVerified(uid, false));
+                            }
+                          },
+                          child: const Text('Quitar'),
+                        )
+                      : null,
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _feedbackTab() {
     return StreamBuilder<Snap>(
       stream: _feedback,
@@ -375,7 +445,7 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Row(
@@ -391,11 +461,18 @@ class _AdminScreenState extends State<AdminScreen> {
               Tab(text: 'Publicaciones'),
               Tab(text: 'Denuncias'),
               Tab(text: 'Opiniones'),
+              Tab(text: 'Verificación'),
             ],
           ),
         ),
         body: TabBarView(
-          children: [_usersTab(), _postsTab(), _reportsTab(), _feedbackTab()],
+          children: [
+            _usersTab(),
+            _postsTab(),
+            _reportsTab(),
+            _feedbackTab(),
+            _verifTab(),
+          ],
         ),
       ),
     );

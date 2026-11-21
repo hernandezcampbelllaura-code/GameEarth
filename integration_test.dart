@@ -65,4 +65,23 @@ void main() {
         headers: _h, body: jsonEncode({}));
     expect(r.statusCode, anyOf(400, 401, 403, 404));
   });
+
+  for (final fn in [
+    'request_verification',
+    'admin_review_verification',
+    'admin_set_verified',
+    'edit_post',
+    'set_birthday',
+    'leave_collab',
+  ]) {
+    test('sin iniciar sesión no se puede llamar $fn', () async {
+      final r = await http.post(_u('/rest/v1/rpc/$fn'), headers: _h, body: jsonEncode({}));
+      expect(r.statusCode, anyOf(400, 401, 403, 404), reason: r.body);
+    });
+  }
+
+  test('sin iniciar sesión no se leen solicitudes de verificación', () async {
+    final r = await http.get(_u('/rest/v1/verification_requests?select=*'), headers: _h);
+    expect(_denied(r), isTrue, reason: r.body);
+  });
 }

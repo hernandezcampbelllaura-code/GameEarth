@@ -6,6 +6,7 @@ import '../net.dart';
 import '../safety.dart';
 import '../services/db.dart';
 import '../widgets/photo_editor.dart';
+import 'search_screen.dart';
 import '../util.dart';
 
 class CreateScreen extends StatefulWidget {
@@ -28,6 +29,8 @@ class _CreateScreenState extends State<CreateScreen> {
     TextEditingController(),
   ];
   PickedMedia? _media;
+  String _collabId = '';
+  String _collabName = '';
   bool _busy = false;
 
   @override
@@ -126,6 +129,7 @@ class _CreateScreenState extends State<CreateScreen> {
         groupId: widget.groupId,
         description: _desc.text.trim(),
         pollOptions: options,
+        collabId: _collabId,
       );
       _text.clear();
       _link.clear();
@@ -134,6 +138,8 @@ class _CreateScreenState extends State<CreateScreen> {
         o.clear();
       }
       _poll = false;
+      _collabId = '';
+      _collabName = '';
       if (mounted) {
         setState(() => _media = null);
         toast(context, 'Publicado');
@@ -230,6 +236,43 @@ class _CreateScreenState extends State<CreateScreen> {
               hintText: 'https://…',
               prefixIcon: Icon(Icons.link),
             ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.group_add_outlined),
+            title: Text(
+              _collabId.isEmpty
+                  ? 'Colaboración (opcional)'
+                  : 'En colaboración con @$_collabName',
+            ),
+            subtitle: const Text(
+              'Aparecerá también en el perfil de la otra persona',
+            ),
+            trailing: _collabId.isEmpty
+                ? const Icon(Icons.chevron_right)
+                : IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(() {
+                      _collabId = '';
+                      _collabName = '';
+                    }),
+                  ),
+            onTap: _busy
+                ? null
+                : () async {
+                    final r = await Navigator.push<List<String>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(pick: true),
+                      ),
+                    );
+                    if (r != null && mounted) {
+                      setState(() {
+                        _collabId = r[0];
+                        _collabName = r[1];
+                      });
+                    }
+                  },
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
