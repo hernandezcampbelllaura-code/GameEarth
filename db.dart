@@ -258,6 +258,24 @@ class Db {
   // Perfiles en memoria (para las fotos de perfil sin abrir mil conexiones).
   static final Map<String, Future<Json?>> _profiles = {};
 
+  /// Las primeras [limit] personas que sigues (las más antiguas primero).
+  static Future<List<Doc>> firstFollowing({int limit = 10}) async {
+    final rows = await sb
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', myUid)
+        .order('created_at', ascending: true)
+        .limit(limit);
+    final ids = [for (final r in rows) r['following_id'].toString()];
+    if (ids.isEmpty) return [];
+    final ps = await sb.from('profiles').select().inFilter('id', ids);
+    final byId = {
+      for (final p in ps)
+        p['id'].toString(): _toDoc(Map<String, dynamic>.from(p), null),
+    };
+    return [for (final id in ids) if (byId[id] != null) byId[id]!];
+  }
+
   static Future<Json?> profileOf(String uid) {
     return _profiles.putIfAbsent(uid, () async {
       try {

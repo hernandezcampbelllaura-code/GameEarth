@@ -23,9 +23,25 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   List<Doc> _results = [];
   String? _error;
+  List<Doc> _following = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowing();
+    Session.i.following.addListener(_loadFollowing);
+  }
+
+  Future<void> _loadFollowing() async {
+    try {
+      final l = await Db.firstFollowing();
+      if (mounted) setState(() => _following = l);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
+    Session.i.following.removeListener(_loadFollowing);
     _debounce?.cancel();
     _ctrl.dispose();
     super.dispose();
@@ -65,6 +81,37 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Widget _tile(Doc d) {
+    final u = d.data();
+    return ListTile(
+      leading: UserAvatar(uid: d.id),
+      title: Text('@${u['username'] ?? ''}'),
+      subtitle: (u['bio'] ?? '').toString().isEmpty
+          ? null
+          : Text(
+              u['bio'].toString(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+      onTap: () {
+        if (widget.pick) {
+          if (d.id == myUid) return;
+          Navigator.pop(
+            context,
+            <String>[d.id, (u['username'] ?? '') as String],
+          );
+          return;
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileScreen(uid: d.id, isMe: d.id == myUid),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -92,54 +139,47 @@ class _SearchScreenState extends State<SearchScreen> {
               valueListenable: Session.i.blocked,
               builder: (context, blocked, _) {
                 if (_error != null) return Center(child: Text(_error!));
-                if (_query.isEmpty) {
-                  return const Center(
-                    child: Text('Escribe un nombre para encontrar gente.'),
-                  );
-                }
-                final list = _results.where((d) {
+                final list = _query.isEmpty
+                    ? <Doc>[]
+                    : _results.where((d) {
+                        final u = d.data();
+                        return u['deleted'] != true && !blocked.contains(d.id);
+                      }).toList();
+                final follows = _following.where((d) {
                   final u = d.data();
                   return u['deleted'] != true && !blocked.contains(d.id);
                 }).toList();
-                if (list.isEmpty && !_loading) {
-                  return const Center(child: Text('Sin resultados.'));
-                }
-                return ListView.builder(
-                  itemCount: list.length,
-                  itemBuilder: (_, i) {
-                    final d = list[i];
-                    final u = d.data();
-                    return ListTile(
-                      leading: UserAvatar(uid: d.id),
-                      title: Text('@${u['username'] ?? ''}'),
-                      subtitle: (u['bio'] ?? '').toString().isEmpty
-                          ? null
-                          : Text(
-                              u['bio'].toString(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                      onTap: () {
-                        if (widget.pick) {
-                          if (d.id == myUid) return;
-                          Navigator.pop(
-                            context,
-                            <String>[d.id, (u['username'] ?? '') as String],
-                          );
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProfileScreen(
-                              uid: d.id,
-                              isMe: d.id == myUid,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                final Widget? note = _query.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Escribe un nombre para encontrar gente.',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : (list.isEmpty && !_loading
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Sin resultados.',
+                                textAlign: TextAlign.center),
+                          )
+                        : null);
+                return ListView(
+                  children: [
+                    for (final d in list) _tile(d),
+                    if (note != null) note,
+                    if (follows.isNotEmpty) ...[
+                      const Divider(),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        child: Text(
+                          'Personas que sigues',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      for (final d in follows) _tile(d),
+                    ],
+                  ],
                 );
               },
             ),
