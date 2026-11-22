@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
 import 'net.dart';
@@ -20,9 +22,47 @@ void main() {
   runApp(const GamingSocialApp());
 }
 
+/// Elige por dónde hablar con Supabase: la dirección normal o, si está
+/// bloqueada, la ruta alternativa (proxy). Recuerda la última que funcionó.
+Future<String> _pickSupabaseUrl() async {
+  const direct = SupabaseConfig.url;
+  const proxy = SupabaseConfig.proxyUrl;
+  if (proxy.isEmpty) return direct;
+  Future<bool> up(String base) async {
+    try {
+      final r = await http
+          .get(Uri.parse('$base/auth/v1/health'),
+              headers: {'apikey': SupabaseConfig.anonKey})
+          .timeout(const Duration(seconds: 4));
+      return r.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String? last;
+  SharedPreferences? prefs;
+  try {
+    prefs = await SharedPreferences.getInstance();
+    last = prefs.getString('sburl');
+  } catch (_) {}
+  final dUp = up(direct);
+  final pUp = up(proxy);
+  String chosen;
+  if (last == proxy) {
+    chosen = await pUp ? proxy : (await dUp ? direct : proxy);
+  } else {
+    chosen = await dUp ? direct : (await pUp ? proxy : direct);
+  }
+  try {
+    await prefs?.setString('sburl', chosen);
+  } catch (_) {}
+  return chosen;
+}
+
 Future<void> _init() async {
   await Supabase.initialize(
-    url: SupabaseConfig.url,
+    url: await _pickSupabaseUrl(),
     anonKey: SupabaseConfig.anonKey,
   );
   await Net.i.start();

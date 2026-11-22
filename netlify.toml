@@ -1,0 +1,10 @@
+# Ruta alternativa a Supabase (para conexiones donde supabase.co está bloqueado).
+# No hay nada que compilar: solo se reenvían las peticiones.
+[build]
+  publish = "proxy"
+
+[[redirects]]
+  from = "/*"
+  to = "https://zagkwwrbfxdbcnevqovr.supabase.co/:splat"
+  status = 200
+  force = true
