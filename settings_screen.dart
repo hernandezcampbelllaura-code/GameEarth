@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../net.dart';
 import '../services/db.dart';
 import '../util.dart';
+import '../widgets/feedback_prompt.dart';
 import 'help_screen.dart';
 
 /// Engranaje: cuenta, cumpleaños, estadísticas, verificación y ayuda.
@@ -72,6 +73,15 @@ class SettingsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (_) => const HelpScreen()),
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.star_outline),
+            title: const Text('Califica la app'),
+            subtitle: const Text('De 1 a 5 estrellas y cuéntanos por qué'),
+            onTap: () async {
+              final sent = await showRatingDialog(context);
+              if (sent && context.mounted) toast(context, '¡Gracias por tu opinión!');
+            },
           ),
           ListTile(
             leading: const Icon(Icons.mail_outline),
