@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -100,19 +102,29 @@ String videoDownloadUrl(String url) {
   return '${url.substring(0, i + marker.length)}fl_attachment/${url.substring(i + marker.length)}';
 }
 
-/// Descarga el video: se abre el enlace de descarga y el teléfono lo guarda.
+/// Descarga el video. En la web se abre el enlace de descarga; en Android se
+/// baja dentro de la app y se abre el menú para guardarlo en el teléfono.
 Future<void> downloadVideo(BuildContext context, String url) async {
-  try {
-    final ok = await launchUrl(
-      Uri.parse(videoDownloadUrl(url)),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!ok && context.mounted) toast(context, 'No se pudo descargar el video.');
-    if (ok && context.mounted) {
-      toast(context, 'Descargando… revisa tus descargas.');
+  if (url.isEmpty) return;
+  if (kIsWeb) {
+    try {
+      await launchUrl(Uri.parse(videoDownloadUrl(url)), webOnlyWindowName: '_blank');
+    } catch (_) {
+      if (context.mounted) toast(context, 'No se pudo descargar el video.');
     }
-  } catch (_) {
-    if (context.mounted) toast(context, 'No se pudo descargar el video.');
+    return;
+  }
+  toast(context, 'Descargando video…');
+  try {
+    final r = await http
+        .get(Uri.parse(url))
+        .timeout(const Duration(minutes: 5));
+    if (r.statusCode != 200) throw Exception('código ${r.statusCode}');
+    await Share.shareXFiles([
+      XFile.fromData(r.bodyBytes, mimeType: 'video/mp4', name: 'GamingSocial.mp4'),
+    ], text: 'Video de GamingSocial');
+  } catch (e) {
+    if (context.mounted) toast(context, 'No se pudo descargar el video: $e');
   }
 }
 
