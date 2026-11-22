@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'config.dart';
 import 'net.dart';
+import 'notifier.dart';
 import 'services/db.dart';
 import 'screens/auth_screen.dart';
 import 'screens/banned_screen.dart';
@@ -36,10 +37,28 @@ class GamingSocialApp extends StatefulWidget {
 
 class _GamingSocialAppState extends State<GamingSocialApp> {
   late Future<void> _ready = _init();
+  final _navKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // La búsqueda de versión nueva funciona aunque no hayas podido iniciar
+    // sesión (por ejemplo, si no hay conexión con el servidor).
+    Future.delayed(const Duration(seconds: 4), () {
+      Updater.start(() => _navKey.currentState!.overlay!.context);
+    });
+  }
+
+  @override
+  void dispose() {
+    Updater.stop();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navKey,
       title: 'GamingSocial',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),

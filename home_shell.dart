@@ -47,7 +47,6 @@ class _HomeShellState extends State<HomeShell> {
       Future.delayed(const Duration(seconds: 3), () {
         if (!mounted) return;
         Notifier.start(context, widget.uid);
-        Updater.start(() => context);
       });
       // Si entró por el enlace de una publicación compartida, se abre.
       final pid = Uri.base.queryParameters['post'];
@@ -73,7 +72,6 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _ratingTimer?.cancel();
     Notifier.stop();
-    Updater.stop();
     Session.i.stop();
     super.dispose();
   }
