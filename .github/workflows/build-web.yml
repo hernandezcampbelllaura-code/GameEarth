@@ -98,7 +98,9 @@ jobs:
         run: flutter build web --release --no-web-resources-cdn --pwa-strategy=none --dart-define=APP_VERSION=${{ github.sha }} --base-href "/${{ github.event.repository.name }}/"
 
       - name: Version file
-        run: echo '{"v":"${{ github.sha }}"}' > build/web/version.json
+        run: |
+          echo '{"v":"${{ github.sha }}"}' > build/web/version.json
+          cp conexion.html build/web/conexion.html
 
       - uses: actions/upload-pages-artifact@v3
         with:

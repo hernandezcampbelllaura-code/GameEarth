@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prueba de conexión</title>
+<style>
+body{font-family:Roboto,Arial,sans-serif;background:#0b1026;color:#fff;margin:0;padding:16px}
+h1{font-size:20px}p{color:#cbd5e1}
+.r{display:flex;justify-content:space-between;padding:12px;margin:6px 0;border-radius:10px;background:#1b1f4b;font-size:16px}
+.ok{color:#4ade80}.no{color:#f87171}.w{color:#fbbf24}
+button{font-size:18px;padding:14px 20px;border:0;border-radius:12px;background:#8b5cf6;color:#fff;margin:12px 0}
+</style></head><body>
+<h1>Prueba de conexión de GamingSocial</h1>
+<p>Esta prueba mira qué servicios abre tu internet. Espera unos segundos y mándale una captura de pantalla a Claude.</p>
+<button onclick="run()">Repetir prueba</button>
+<div id="out"></div>
+<script>
+const H=[
+['Esta web (GitHub Pages)','https://hernandezcampbelllaura-code.github.io/'],
+['Supabase (la base de datos)','https://zagkwwrbfxdbcnevqovr.supabase.co/auth/v1/health'],
+['Cloudinary (fotos y videos)','https://res.cloudinary.com/'],
+['Cloudflare Workers','https://prueba-gs.workers.dev/'],
+['Cloudflare Pages','https://prueba-gs.pages.dev/'],
+['Vercel','https://prueba-gs.vercel.app/'],
+['Netlify','https://prueba-gs.netlify.app/'],
+['Render','https://prueba-gs.onrender.com/'],
+['Fly.io','https://prueba-gs.fly.dev/'],
+['Deno Deploy','https://prueba-gs.deno.dev/'],
+['Koyeb','https://prueba-gs.koyeb.app/'],
+['jsDelivr','https://cdn.jsdelivr.net/'],
+['Google','https://www.google.com/generate_204']
+];
+async function t(u){
+  const c=new AbortController();const id=setTimeout(()=>c.abort(),9000);
+  const s=performance.now();
+  try{await fetch(u+(u.includes('?')?'&':'?')+'t='+Date.now(),{mode:'no-cors',cache:'no-store',signal:c.signal});
+    return ['ok',Math.round(performance.now()-s)];}
+  catch(e){return [c.signal.aborted?'slow':'no',0];}
+  finally{clearTimeout(id);}
+}
+async function run(){
+  const o=document.getElementById('out');o.innerHTML='';
+  const rows=H.map(h=>{const d=document.createElement('div');d.className='r';d.innerHTML='<span>'+h[0]+'</span><span class="w">probando…</span>';o.appendChild(d);return d;});
+  await Promise.all(H.map(async(h,i)=>{
+    const [s,ms]=await t(h[1]);
+    rows[i].lastChild.className=s=='ok'?'ok':s=='slow'?'w':'no';
+    rows[i].lastChild.textContent=s=='ok'?'✅ abre ('+ms+' ms)':s=='slow'?'⏳ muy lento':'❌ bloqueado';
+  }));
+}
+run();
+</script></body></html>
