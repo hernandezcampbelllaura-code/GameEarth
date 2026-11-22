@@ -4,7 +4,8 @@ import 'help_screen.dart';
 import '../net.dart';
 import '../safety.dart';
 import '../services/db.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthException, AuthRetryableFetchException;
 
 import '../util.dart';
 
@@ -96,7 +97,9 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on AuthException catch (e) {
       TermsState.accepted = false;
-      final code = (e.code ?? e.message).toString();
+      final code = e is AuthRetryableFetchException
+          ? 'retryable'
+          : (e.code ?? e.message).toString();
       var msg = _message(code, e.message);
       if (!_register && code.contains('invalid')) {
         msg = await _loginFailMessage(msg);
@@ -110,7 +113,7 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) setState(() => _error = msg);
     } catch (e) {
       TermsState.accepted = false;
-      if (mounted) setState(() => _error = 'Error: $e');
+      if (mounted) setState(() => _error = _message('$e', '$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -148,6 +151,21 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String _message(String code, [String? detail]) {
     final c = code.toLowerCase();
+    // Sin llegar al servidor: el texto del error incluye la dirección de
+    // la petición (con la palabra "password"), por eso se revisa primero.
+    if (c.contains('clientexception') ||
+        c.contains('socketexception') ||
+        c.contains('failed host') ||
+        c.contains('connection') ||
+        c.contains('timeout') ||
+        c.contains('handshake') ||
+        c.contains('network') ||
+        c.contains('socket') ||
+        c.contains('xmlhttprequest') ||
+        c.contains('retryable')) {
+      return 'No se pudo conectar con el servidor. Revisa tu internet o '
+          'inténtalo de nuevo en un momento.';
+    }
     if (c.contains('invalid_credentials') || c.contains('invalid login')) {
       return 'Correo o contraseña incorrectos.';
     }
@@ -155,7 +173,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (c.contains('already') || c.contains('exists')) {
       return 'Ese correo ya está registrado.';
     }
-    if (c.contains('weak') || c.contains('password')) {
+    if (c.contains('weak_password') || c == 'weak password') {
       return 'Contraseña muy débil. Usa al menos 8 caracteres.';
     }
     if (c.contains('not_confirmed') || c.contains('not confirmed')) {
