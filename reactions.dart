@@ -132,13 +132,16 @@ List<MapEntry<String, int>> sortedReactions(dynamic counts) {
 /// Fila con la cantidad de cada reacción: ❤️ 3  👍 2  😮 1
 class ReactionSummary extends StatelessWidget {
   final dynamic counts;
-  const ReactionSummary({super.key, required this.counts});
+
+  /// Si se indica, al tocar se ve quién reaccionó con cada reacción.
+  final String? postId;
+  const ReactionSummary({super.key, required this.counts, this.postId});
 
   @override
   Widget build(BuildContext context) {
     final list = sortedReactions(counts);
     if (list.isEmpty) return const SizedBox.shrink();
-    return Wrap(
+    final w = Wrap(
       spacing: 12,
       runSpacing: 2,
       children: [
@@ -156,5 +159,79 @@ class ReactionSummary extends StatelessWidget {
           ),
       ],
     );
+    final id = postId;
+    if (id == null) return w;
+    return InkWell(
+      onTap: () => showReactionsSheet(context, id),
+      child: w,
+    );
   }
+}
+
+/// Lista de personas que reaccionaron, con una pestaña por reacción.
+Future<void> showReactionsSheet(BuildContext context, String postId) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => SizedBox(
+      height: MediaQuery.of(ctx).size.height * 0.6,
+      child: FutureBuilder<List<Map<String, String>>>(
+        future: Db.reactionUsers(postId),
+        builder: (ctx, snap) {
+          if (snap.hasError) {
+            return Center(child: Text('No se pudo cargar: ${snap.error}'));
+          }
+          if (!snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final all = snap.data!;
+          if (all.isEmpty) {
+            return const Center(child: Text('Aún no hay reacciones.'));
+          }
+          final types = [
+            for (final r in kReactions)
+              if (all.any((e) => e['type'] == r[0])) r[0],
+          ];
+          return DefaultTabController(
+            length: types.length + 1,
+            child: Column(
+              children: [
+                TabBar(
+                  isScrollable: true,
+                  tabs: [
+                    Tab(text: 'Todas ${all.length}'),
+                    for (final t in types)
+                      Tab(
+                        text:
+                            '${reactionEmoji(t)} ${all.where((e) => e['type'] == t).length}',
+                      ),
+                  ],
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      for (final t in [null, ...types])
+                        ListView(
+                          children: [
+                            for (final e in all.where((e) => t == null || e['type'] == t))
+                              ListTile(
+                                dense: true,
+                                leading: Text(
+                                  reactionEmoji(e['type']!),
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                                title: Text('@${e['name']}'),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
 }

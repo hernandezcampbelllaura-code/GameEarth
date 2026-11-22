@@ -302,7 +302,10 @@ class PostCard extends StatelessWidget {
           if (likes > 0)
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 2),
-              child: ReactionSummary(counts: d['reactionCounts']),
+              child: ReactionSummary(
+                counts: d['reactionCounts'],
+                postId: doc.id,
+              ),
             ),
           Row(
             children: [

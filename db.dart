@@ -357,6 +357,28 @@ class Db {
     }
   }
 
+  /// Quién reaccionó y con qué (para ver los nombres por reacción).
+  static Future<List<Map<String, String>>> reactionUsers(String postId) async {
+    final rows = await sb
+        .from('likes')
+        .select('user_id,type,created_at')
+        .eq('post_id', postId)
+        .order('created_at', ascending: false)
+        .limit(500);
+    final ids = {for (final r in rows) r['user_id'].toString()}.toList();
+    if (ids.isEmpty) return [];
+    final ps = await sb.from('profiles').select('id,username').inFilter('id', ids);
+    final names = {for (final p in ps) p['id'].toString(): (p['username'] ?? '').toString()};
+    return [
+      for (final r in rows)
+        {
+          'uid': r['user_id'].toString(),
+          'name': names[r['user_id'].toString()] ?? '',
+          'type': (r['type'] ?? 'love').toString(),
+        },
+    ];
+  }
+
   /// Cuenta cuántas reacciones hay de cada tipo.
   static Future<Map<String, int>> reactionCounts(String postId) async {
     final rows = await sb.from('likes').select('type').eq('post_id', postId).limit(1000);
