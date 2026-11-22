@@ -326,6 +326,14 @@ class _ReelPageState extends State<_ReelPage> {
                 onTap: () => showCommentsSheet(context, widget.doc.id),
               ),
               _Action(
+                icon: Icons.download_outlined,
+                label: 'Descargar',
+                onTap: () => downloadVideo(
+                  context,
+                  (widget.doc.data()?['videoUrl'] ?? '') as String,
+                ),
+              ),
+              _Action(
                 icon: Icons.share_outlined,
                 label: 'Compartir',
                 onTap: () => sharePost(postId: widget.doc.id),

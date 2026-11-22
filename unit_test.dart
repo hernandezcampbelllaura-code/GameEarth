@@ -58,6 +58,13 @@ void main() {
       expect(cleanUrl('no es un enlace'), '');
       expect(cleanUrl('javascript:alert(1)'), '');
     });
+    test('videoDownloadUrl fuerza la descarga solo en Cloudinary', () {
+      expect(
+        videoDownloadUrl('https://res.cloudinary.com/hagnq5mv/video/upload/v1/a.mp4'),
+        'https://res.cloudinary.com/hagnq5mv/video/upload/fl_attachment/v1/a.mp4',
+      );
+      expect(videoDownloadUrl('https://otro.com/a.mp4'), 'https://otro.com/a.mp4');
+    });
     test('postLink apunta a la web con el id', () {
       expect(postLink('abc-123'), '${kWebUrl}?post=abc-123');
       expect(postLink('abc-123').contains('abc-123'), isTrue);

@@ -92,6 +92,30 @@ Future<void> openLink(BuildContext context, String url) async {
 }
 
 /// Abre el menú de compartir del teléfono (WhatsApp, etc.).
+/// Dirección que obliga al navegador a descargar el video (Cloudinary).
+String videoDownloadUrl(String url) {
+  const marker = '/upload/';
+  final i = url.indexOf(marker);
+  if (i < 0 || !url.startsWith('https://res.cloudinary.com/')) return url;
+  return '${url.substring(0, i + marker.length)}fl_attachment/${url.substring(i + marker.length)}';
+}
+
+/// Descarga el video: se abre el enlace de descarga y el teléfono lo guarda.
+Future<void> downloadVideo(BuildContext context, String url) async {
+  try {
+    final ok = await launchUrl(
+      Uri.parse(videoDownloadUrl(url)),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && context.mounted) toast(context, 'No se pudo descargar el video.');
+    if (ok && context.mounted) {
+      toast(context, 'Descargando… revisa tus descargas.');
+    }
+  } catch (_) {
+    if (context.mounted) toast(context, 'No se pudo descargar el video.');
+  }
+}
+
 /// Enlace que abre una publicación en la versión web.
 String postLink(String postId) => '$kWebUrl?post=$postId';
 

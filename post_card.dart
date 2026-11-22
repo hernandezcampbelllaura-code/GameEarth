@@ -47,6 +47,12 @@ class PostCard extends StatelessWidget {
           }
           break;
         }
+      case 'download':
+        await downloadVideo(
+          context,
+          (doc.data()?['videoUrl'] ?? '') as String,
+        );
+        break;
       case 'edit':
         await _editDialog(context);
         break;
@@ -211,6 +217,11 @@ class PostCard extends StatelessWidget {
                 icon: const Icon(Icons.more_vert),
                 onSelected: (v) => _menu(context, v, authorId, author, text),
                 itemBuilder: (_) => [
+                  if (((d['videoUrl'] ?? '') as String).isNotEmpty)
+                    const PopupMenuItem(
+                      value: 'download',
+                      child: Text('Descargar video'),
+                    ),
                   if (mine)
                     const PopupMenuItem(value: 'edit', child: Text('Editar')),
                   if (d['collabId'] == myUid)
