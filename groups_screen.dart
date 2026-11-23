@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../services/db.dart';
 import '../util.dart';
@@ -32,13 +33,13 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 TextField(
                   controller: name,
                   maxLength: 40,
-                  decoration: const InputDecoration(labelText: 'Nombre del grupo'),
+                  decoration: InputDecoration(labelText: tr('Nombre del grupo')),
                 ),
                 TextField(
                   controller: desc,
                   maxLength: 200,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Descripción'),
+                  decoration: InputDecoration(labelText: tr('Descripción')),
                 ),
                 if (error != null)
                   Text(

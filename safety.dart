@@ -1,6 +1,7 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'l10n.dart';
 
 /// Filtro de palabras ofensivas o sexuales (texto). Es una primera barrera
 /// automática; lo que se escape lo atrapan las denuncias y el administrador.

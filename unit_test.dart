@@ -2,6 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamingsocial/safety.dart';
 import 'package:gamingsocial/util.dart';
 import 'package:gamingsocial/config.dart';
+import 'package:gamingsocial/l10n.dart';
+import 'package:gamingsocial/l10n_data.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:gamingsocial/services/db.dart';
 import 'package:gamingsocial/widgets/reactions.dart';
 import 'package:gamingsocial/screens/settings_screen.dart';
@@ -129,6 +132,60 @@ void main() {
     });
     test('sin publicaciones todo es cero', () {
       expect(statsTotals([])['views'], 0);
+    });
+  });
+
+  group('Idiomas', () {
+    tearDown(() => L.code.value = 'es');
+    test('todas las traducciones tienen 5 idiomas y ninguna está vacía', () {
+      kTr.forEach((k, v) {
+        expect(v.length, 5, reason: k);
+        for (final t in v) {
+          expect(t.trim().isNotEmpty, isTrue, reason: k);
+        }
+      });
+    });
+    test('español devuelve el original', () {
+      L.code.value = 'es';
+      expect(tr('Guardar'), 'Guardar');
+    });
+    test('traduce a cada idioma', () {
+      L.code.value = 'en';
+      expect(tr('Guardar'), 'Save');
+      L.code.value = 'fr';
+      expect(tr('Guardar'), 'Enregistrer');
+      L.code.value = 'pt';
+      expect(tr('Guardar'), 'Salvar');
+      L.code.value = 'de';
+      expect(tr('Guardar'), 'Speichern');
+      L.code.value = 'ru';
+      expect(tr('Guardar'), 'Сохранить');
+    });
+    test('texto sin traducción queda en español', () {
+      L.code.value = 'en';
+      expect(tr('texto que no existe'), 'texto que no existe');
+    });
+    test('inglés de Inglaterra', () {
+      L.code.value = 'en_GB';
+      expect(tr('Juegos favoritos (separados por coma)'),
+          'Favourite games (comma separated)');
+    });
+    test('español de España', () {
+      L.code.value = 'es_ES';
+      expect(tr('Califica la app'), 'Valora la app');
+      expect(tr('Descargar video'), 'Descargar vídeo');
+    });
+    test('trf rellena marcadores', () {
+      L.code.value = 'en';
+      expect(trf('hace {n} min', {'n': 5}), '5 min ago');
+    });
+    test('detecta idioma del teléfono', () {
+      expect(L.detect(const Locale('es', 'ES')), 'es_ES');
+      expect(L.detect(const Locale('es', 'CU')), 'es');
+      expect(L.detect(const Locale('en', 'GB')), 'en_GB');
+      expect(L.detect(const Locale('en', 'US')), 'en');
+      expect(L.detect(const Locale('ru')), 'ru');
+      expect(L.detect(const Locale('ja')), 'en');
     });
   });
 }

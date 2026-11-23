@@ -1,6 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,8 +19,9 @@ import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, AuthState
 
 /// La app se dibuja al instante (pantalla de inicio) y la conexión se prepara
 /// por detrás, para que nunca se vea una pantalla en blanco.
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await L.init();
   runApp(const GamingSocialApp());
 }
 
@@ -75,13 +78,15 @@ class GamingSocialApp extends StatefulWidget {
   State<GamingSocialApp> createState() => _GamingSocialAppState();
 }
 
-class _GamingSocialAppState extends State<GamingSocialApp> {
+class _GamingSocialAppState extends State<GamingSocialApp>
+    with WidgetsBindingObserver {
   late Future<void> _ready = _init();
   final _navKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // La búsqueda de versión nueva funciona aunque no hayas podido iniciar
     // sesión (por ejemplo, si no hay conexión con el servidor).
     Future.delayed(const Duration(seconds: 4), () {
@@ -90,14 +95,31 @@ class _GamingSocialAppState extends State<GamingSocialApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    appActive = state == AppLifecycleState.resumed;
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     Updater.stop();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<String>(
+      valueListenable: L.code,
+      builder: (context, code, _) => _buildApp(code),
+    );
+  }
+
+  Widget _buildApp(String code) {
     return MaterialApp(
+      key: ValueKey(code),
+      locale: L.locale,
+      supportedLocales: kSupportedLocales,
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       navigatorKey: _navKey,
       title: 'GamingSocial',
       debugShowCheckedModeBanner: false,

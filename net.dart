@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'l10n.dart';
 
 /// Estado de la conexión a internet (conectado / sin conexión / recuperada).
 class Net {
@@ -144,10 +145,11 @@ Future<bool> requireOnline(BuildContext context, String action) async {
     builder: (ctx) => AlertDialog(
       icon: const Icon(Icons.wifi_off, size: 32),
       title: const Text('No estás conectado'),
-      content: Text(
-        'No puedes $action sin internet. Cuando vuelva la conexión te '
+      content: Text(trf(
+        'No puedes {a} sin internet. Cuando vuelva la conexión te '
         'avisaremos y podrás intentarlo de nuevo.',
-      ),
+        {'a': tr(action)},
+      )),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(ctx),

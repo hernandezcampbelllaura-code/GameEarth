@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../services/db.dart';
 import 'settings_screen.dart';
@@ -111,13 +112,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   controller: bio,
                   maxLength: 160,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Bio'),
+                  decoration: InputDecoration(labelText: tr('Bio')),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: games,
-                  decoration: const InputDecoration(
-                    labelText: 'Juegos favoritos (separados por coma)',
+                  decoration: InputDecoration(
+                    labelText: tr('Juegos favoritos (separados por coma)'),
                   ),
                 ),
               ],
@@ -217,13 +218,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text(widget.isMe ? 'Mi perfil' : 'Perfil'),
         actions: [
           IconButton(
-            tooltip: 'Contacto',
+            tooltip: tr('Contacto'),
             onPressed: () => showContactDialog(context),
             icon: const Icon(Icons.mail_outline),
           ),
           if (widget.isMe)
             IconButton(
-              tooltip: 'Configuración',
+              tooltip: tr('Configuración'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -232,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           if (widget.isMe)
             IconButton(
-              tooltip: 'Cerrar sesión',
+              tooltip: tr('Cerrar sesión'),
               onPressed: _logout,
               icon: const Icon(Icons.logout),
             ),

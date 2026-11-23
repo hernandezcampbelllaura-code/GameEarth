@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
 
 import '../net.dart';
 import '../services/db.dart';
 import '../util.dart';
 import '../widgets/feedback_prompt.dart';
 import 'help_screen.dart';
+import 'legal_screen.dart';
+import '../l10n.dart';
 
 /// Engranaje: cuenta, cumpleaños, estadísticas, verificación y ayuda.
 class SettingsScreen extends StatelessWidget {
@@ -84,6 +86,26 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.language),
+            title: const Text('Idioma'),
+            subtitle: Text(languageName(L.code.value)),
+            onTap: () async {
+              await showLanguagePicker(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Política de privacidad'),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const LegalScreen.privacy())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.security),
+            title: const Text('Política de seguridad'),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const LegalScreen.security())),
+          ),
+          ListTile(
             leading: const Icon(Icons.mail_outline),
             title: const Text('Contacto'),
             onTap: () => showContactDialog(context),
@@ -156,7 +178,7 @@ class _StatsScreenState extends State<StatsScreen> {
         title: const Text('Estadísticas'),
         actions: [
           IconButton(
-            tooltip: 'Actualizar',
+            tooltip: tr('Actualizar'),
             icon: const Icon(Icons.refresh),
             onPressed: () => setState(() => _future = Db.myPosts()),
           ),
@@ -406,9 +428,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                       controller: _note,
                       maxLength: 300,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Mensaje (opcional)',
-                        hintText: 'Cuéntanos quién eres o qué contenido haces',
+                      decoration: InputDecoration(
+                        labelText: tr('Mensaje (opcional)'),
+                        hintText: tr('Cuéntanos quién eres o qué contenido haces'),
                       ),
                     ),
                     FilledButton.icon(

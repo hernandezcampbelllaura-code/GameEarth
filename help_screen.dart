@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../net.dart';
 import '../safety.dart';
@@ -106,8 +107,8 @@ class _HelpScreenState extends State<HelpScreen> {
           maxLength: 300,
           maxLines: 4,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Escribe tu pregunta…',
+          decoration: InputDecoration(
+            hintText: tr('Escribe tu pregunta…'),
           ),
         ),
         actions: [
@@ -155,9 +156,9 @@ class _HelpScreenState extends State<HelpScreen> {
           TextField(
             controller: _search,
             onChanged: (v) => setState(() => _q = v.trim()),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               prefixIcon: Icon(Icons.search),
-              hintText: 'Busca tu duda: iniciar sesión, publicar…',
+              hintText: tr('Busca tu duda: iniciar sesión, publicar…'),
               border: OutlineInputBorder(),
             ),
           ),

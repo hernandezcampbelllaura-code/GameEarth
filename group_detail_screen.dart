@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../services/db.dart';
 import '../util.dart';
@@ -76,7 +77,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 actions: [
                   if (canDelete)
                     IconButton(
-                      tooltip: 'Eliminar grupo',
+                      tooltip: tr('Eliminar grupo'),
                       icon: const Icon(Icons.delete_outline),
                       onPressed: _delete,
                     ),

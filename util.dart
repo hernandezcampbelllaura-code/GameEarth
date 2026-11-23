@@ -1,18 +1,19 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'config.dart';
 
 String formatDate(dynamic ts) {
-  if (ts is! DateTime) return 'ahora';
+  if (ts is! DateTime) return tr('ahora');
   final d = ts;
   final diff = DateTime.now().difference(d);
-  if (diff.inMinutes < 1) return 'ahora';
-  if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-  if (diff.inHours < 24) return 'hace ${diff.inHours} h';
+  if (diff.inMinutes < 1) return tr('ahora');
+  if (diff.inMinutes < 60) return trf('hace {n} min', {'n': diff.inMinutes});
+  if (diff.inHours < 24) return trf('hace {n} h', {'n': diff.inHours});
   return '${d.day}/${d.month}/${d.year}';
 }
 
@@ -37,7 +38,7 @@ Future<bool> confirmDialog(BuildContext context, String message) async {
 }
 
 void toast(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(msg))));
 }
 
 /// Fecha completa dd/mm/aaaa (para el panel de admin).

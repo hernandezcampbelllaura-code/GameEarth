@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../net.dart';
 import '../safety.dart';
@@ -263,8 +264,8 @@ class _ChatScreenState extends State<ChatScreen> {
                           maxLength: 500,
                           maxLines: 1,
                           onSubmitted: (_) => _send(),
-                          decoration: const InputDecoration(
-                            hintText: 'Escribe un mensaje…',
+                          decoration: InputDecoration(
+                            hintText: tr('Escribe un mensaje…'),
                             counterText: '',
                           ),
                         ),

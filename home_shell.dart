@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../notifier.dart';
 import '../services/db.dart';
@@ -171,7 +172,7 @@ class _HomeShellState extends State<HomeShell> {
                     NavigationDestination(
                       icon: Icon(d.icon),
                       selectedIcon: Icon(d.selectedIcon),
-                      label: d.label,
+                      label: tr(d.label),
                     ),
                 ],
               ),

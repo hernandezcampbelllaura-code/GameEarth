@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../net.dart';
 import '../services/db.dart';
@@ -52,7 +53,7 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
           actions: [
             IconButton(
-              tooltip: 'Ayuda y preguntas',
+              tooltip: tr('Ayuda y preguntas'),
               icon: const Icon(Icons.help_outline),
               onPressed: () => Navigator.push(
                 context,
@@ -60,7 +61,7 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
             IconButton(
-              tooltip: 'Buscar jugadores',
+              tooltip: tr('Buscar jugadores'),
               icon: const Icon(Icons.search),
               onPressed: () => Navigator.push(
                 context,
@@ -68,8 +69,8 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
             ),
           ],
-          bottom: const TabBar(
-            tabs: [Tab(text: 'Para ti'), Tab(text: 'Siguiendo'), Tab(text: 'Chats')],
+          bottom: TabBar(
+            tabs: [Tab(text: tr('Para ti')), Tab(text: tr('Siguiendo')), Tab(text: tr('Chats'))],
           ),
         ),
         body: StreamBuilder<Snap>(

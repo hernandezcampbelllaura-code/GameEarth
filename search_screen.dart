@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../services/db.dart';
 import '../widgets/user_avatar.dart';
@@ -127,8 +128,8 @@ class _SearchScreenState extends State<SearchScreen> {
               onChanged: _onChanged,
               textInputAction: TextInputAction.search,
               onSubmitted: _search,
-              decoration: const InputDecoration(
-                hintText: 'Buscar por nombre de usuario',
+              decoration: InputDecoration(
+                hintText: tr('Buscar por nombre de usuario'),
                 prefixIcon: Icon(Icons.search),
               ),
             ),

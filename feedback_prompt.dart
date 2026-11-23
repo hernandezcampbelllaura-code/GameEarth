@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 
 import '../services/db.dart';
 import '../util.dart';
@@ -44,8 +45,8 @@ Future<bool> showRatingDialog(BuildContext context) async {
                 maxLines: 4,
                 minLines: 3,
                 enabled: !sending,
-                decoration: const InputDecoration(
-                  labelText: '¿Por qué esa calificación?',
+                decoration: InputDecoration(
+                  labelText: tr('¿Por qué esa calificación?'),
                 ),
               ),
               if (error != null)

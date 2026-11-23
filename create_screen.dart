@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 import 'package:image_picker/image_picker.dart' show ImageSource;
 
 import '../net.dart';
@@ -213,8 +214,8 @@ class _CreateScreenState extends State<CreateScreen> {
             maxLength: 500,
             maxLines: 6,
             minLines: 4,
-            decoration: const InputDecoration(
-              hintText: '¿Qué está pasando en tu partida?',
+            decoration: InputDecoration(
+              hintText: tr('¿Qué está pasando en tu partida?'),
             ),
           ),
           const SizedBox(height: 4),
@@ -223,17 +224,17 @@ class _CreateScreenState extends State<CreateScreen> {
             maxLength: 500,
             maxLines: 3,
             minLines: 2,
-            decoration: const InputDecoration(
-              labelText: 'Descripción (opcional, se ve en Reels)',
+            decoration: InputDecoration(
+              labelText: tr('Descripción (opcional, se ve en Reels)'),
               prefixIcon: Icon(Icons.notes),
             ),
           ),
           TextField(
             controller: _link,
             keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              labelText: 'Enlace (opcional)',
-              hintText: 'https://…',
+            decoration: InputDecoration(
+              labelText: tr('Enlace (opcional)'),
+              hintText: tr('https://…'),
               prefixIcon: Icon(Icons.link),
             ),
           ),
@@ -299,7 +300,7 @@ class _CreateScreenState extends State<CreateScreen> {
                     ),
                     if (_opts.length > 2)
                       IconButton(
-                        tooltip: 'Quitar opción',
+                        tooltip: tr('Quitar opción'),
                         icon: const Icon(Icons.close),
                         onPressed: _busy
                             ? null

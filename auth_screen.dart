@@ -1,4 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as m;
+import '../l10n.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'legal_screen.dart';
 import 'help_screen.dart';
 
 import '../net.dart';
@@ -213,18 +216,23 @@ class _AuthScreenState extends State<AuthScreen> {
                     'GamingSocial',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
-                  const SizedBox(height: 32),
+                  TextButton.icon(
+                    onPressed: () => showLanguagePicker(context),
+                    icon: const Icon(Icons.language),
+                    label: m.Text(languageName(L.code.value)),
+                  ),
+                  const SizedBox(height: 24),
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Correo'),
+                    decoration: InputDecoration(labelText: tr('Correo')),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _pass,
                     obscureText: true,
                     decoration: InputDecoration(
-                      labelText: 'Contraseña',
+                      labelText: tr('Contraseña'),
                       helperText: _register ? 'Mínimo 8 caracteres' : null,
                     ),
                     onSubmitted: (_) => canSubmit ? _submit() : null,
@@ -411,6 +419,20 @@ class TermsScreen extends StatelessWidget {
             Text(s[1], style: const TextStyle(height: 1.4)),
             const SizedBox(height: 18),
           ],
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const LegalScreen.privacy())),
+              child: const Text('Política de privacidad'),
+            ),
+          ),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const LegalScreen.security())),
+              child: const Text('Política de seguridad'),
+            ),
+          ),
           Center(
             child: TextButton(
               onPressed: () => showContactDialog(context),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 import 'package:video_player/video_player.dart';
 
 import '../services/db.dart';
@@ -327,7 +328,7 @@ class _ReelPageState extends State<_ReelPage> {
               ),
               _Action(
                 icon: Icons.download_outlined,
-                label: 'Descargar',
+                label: tr('Descargar'),
                 onTap: () => downloadVideo(
                   context,
                   (widget.doc.data()?['videoUrl'] ?? '') as String,
@@ -335,7 +336,7 @@ class _ReelPageState extends State<_ReelPage> {
               ),
               _Action(
                 icon: Icons.share_outlined,
-                label: 'Compartir',
+                label: tr('Compartir'),
                 onTap: () => sharePost(postId: widget.doc.id),
               ),
             ],

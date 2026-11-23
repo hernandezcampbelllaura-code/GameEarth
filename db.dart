@@ -82,8 +82,12 @@ List<MapEntry<Doc, bool>> threadComments(List<Doc> all) {
 int _watchCounter = 0;
 
 /// Convierte una consulta en un flujo que se actualiza solo: escucha los
-/// cambios en tiempo real y además revisa cada 20 segundos por si la conexión
+/// cambios en tiempo real y además revisa cada 45 segundos por si la conexión
 /// en tiempo real está bloqueada.
+/// Falso cuando la app está en segundo plano: así no se consulta el servidor
+/// sin necesidad (ahorra datos y carga cuando hay muchas personas conectadas).
+bool appActive = true;
+
 Stream<Snap> watchQuery(
   String table,
   Future<List<dynamic>> Function() load, {
@@ -134,7 +138,9 @@ Stream<Snap> watchQuery(
             )
             .subscribe();
       } catch (_) {}
-      poll = Timer.periodic(const Duration(seconds: 20), (_) => run());
+      poll = Timer.periodic(const Duration(seconds: 45), (_) {
+        if (appActive) run();
+      });
     },
     onCancel: () {
       closed = true;

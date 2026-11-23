@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../l10n.dart';
 import 'package:video_player/video_player.dart';
 
 import '../screens/profile_screen.dart';
@@ -87,17 +88,17 @@ class PostCard extends StatelessWidget {
                 controller: text,
                 maxLength: 500,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Texto'),
+                decoration: InputDecoration(labelText: tr('Texto')),
               ),
               TextField(
                 controller: desc,
                 maxLength: 500,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Descripción'),
+                decoration: InputDecoration(labelText: tr('Descripción')),
               ),
               TextField(
                 controller: link,
-                decoration: const InputDecoration(labelText: 'Enlace (opcional)'),
+                decoration: InputDecoration(labelText: tr('Enlace (opcional)')),
               ),
             ],
           ),
