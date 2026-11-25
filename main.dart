@@ -121,7 +121,7 @@ class _GamingSocialAppState extends State<GamingSocialApp>
       supportedLocales: kSupportedLocales,
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       navigatorKey: _navKey,
-      title: 'GamingSocial',
+      title: 'GamersLore',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       builder: (context, child) =>
@@ -193,7 +193,7 @@ class _LoaderState extends State<_Loader> {
             const Icon(Icons.sports_esports, size: 64),
             const SizedBox(height: 8),
             const Text(
-              'GamingSocial',
+              'GamersLore',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),

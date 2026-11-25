@@ -12,7 +12,7 @@ class SupabaseConfig {
 }
 
 /// Dirección de la versión web (los enlaces compartidos apuntan aquí).
-const String kWebUrl = 'https://hernandezcampbelllaura-code.github.io/GameEarth/';
+const String kWebUrl = 'https://gamerslore.com/';
 
 /// Datos de Cloudinary: el almacén gratuito donde se guardan las fotos y los
 /// videos que la gente sube desde su galería. Ninguno de los dos es secreto.

@@ -122,8 +122,8 @@ Future<void> downloadVideo(BuildContext context, String url) async {
         .timeout(const Duration(minutes: 5));
     if (r.statusCode != 200) throw Exception('código ${r.statusCode}');
     await Share.shareXFiles([
-      XFile.fromData(r.bodyBytes, mimeType: 'video/mp4', name: 'GamingSocial.mp4'),
-    ], text: 'Video de GamingSocial');
+      XFile.fromData(r.bodyBytes, mimeType: 'video/mp4', name: 'GamersLore.mp4'),
+    ], text: 'Video de GamersLore');
   } catch (e) {
     if (context.mounted) toast(context, 'No se pudo descargar el video: $e');
   }
@@ -166,7 +166,7 @@ Future<void> showContactDialog(BuildContext context) {
             final uri = Uri(
               scheme: 'mailto',
               path: kContactEmail,
-              queryParameters: {'subject': 'GamingSocial - Contacto'},
+              queryParameters: {'subject': 'GamersLore - Contacto'},
             );
             try {
               final ok =

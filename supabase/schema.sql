@@ -1,4 +1,4 @@
--- GamingSocial en Supabase: tablas, seguridad (RLS), contadores y freno anti-bots.
+-- GamersLore en Supabase: tablas, seguridad (RLS), contadores y freno anti-bots.
 
 -- ===== Funciones base =====
 create table public.admins (

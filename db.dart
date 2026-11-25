@@ -457,7 +457,7 @@ class Db {
             Uri.parse(url),
             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
             body: jsonEncode({
-              'asunto': 'Solicitud de verificación en GamingSocial',
+              'asunto': 'Solicitud de verificación en GamersLore',
               'usuario': Session.i.username,
               'nota': note,
             }),
@@ -521,7 +521,7 @@ class Db {
               'Accept': 'application/json',
             },
             body: jsonEncode({
-              '_subject': 'GamingSocial: $stars/5 de @$name',
+              '_subject': 'GamersLore: $stars/5 de @$name',
               'estrellas': '$stars de 5',
               'usuario': '@$name',
               'motivo': reason,

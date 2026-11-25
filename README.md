@@ -1,4 +1,4 @@
-# GamingSocial
+# GamersLore
 
 Red social gamer para Android hecha con Flutter + Firebase.
 

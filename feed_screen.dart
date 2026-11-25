@@ -45,7 +45,7 @@ class _FeedScreenState extends State<FeedScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'GamingSocial',
+                'GamersLore',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               ConnectionDot(),

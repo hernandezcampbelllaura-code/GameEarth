@@ -68,7 +68,7 @@ jobs:
           fi
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application#' "$M"
-          sed -i 's#android:label="[^"]*"#android:label="GamingSocial"#' "$M"
+          sed -i 's#android:label="[^"]*"#android:label="GamersLore"#' "$M"
 
       - run: flutter pub get
 
@@ -111,4 +111,4 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk GamingSocial.apk
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest GamingSocial.apk --title "GamingSocial (APK más reciente)" --notes "Descarga GamingSocial.apk e instálala. version:${{ github.sha }}"
+          gh release create apk-latest GamingSocial.apk --title "GamersLore (APK más reciente)" --notes "Descarga GamingSocial.apk e instálala. version:${{ github.sha }}"

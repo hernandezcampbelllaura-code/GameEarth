@@ -16,7 +16,7 @@ class LegalScreen extends StatelessWidget {
     ['3. Quién puede ver qué', 'Tus publicaciones, perfil y comentarios los ven otros usuarios de la app. Tu correo y tu fecha de nacimiento completa nunca se muestran a otros. Los mensajes solo los ven los participantes del chat.'],
     ['4. Servicios que usamos', 'Guardamos los datos en Supabase y las fotos y videos en Cloudinary. Estos proveedores procesan la información solo para prestar el servicio.'],
     ['5. Tus derechos', 'Puedes editar o borrar tus publicaciones, tu cumpleaños y tu perfil cuando quieras. Si quieres que eliminemos tu cuenta y tus datos, escríbenos desde Contacto en la app.'],
-    ['6. Menores', 'GamingSocial es solo para mayores de 18 años. Si detectamos una cuenta de un menor, la eliminamos.'],
+    ['6. Menores', 'GamersLore es solo para mayores de 18 años. Si detectamos una cuenta de un menor, la eliminamos.'],
     ['7. Cambios', 'Podemos actualizar esta política. Si sigues usando la app después de un cambio, se entiende que lo aceptas.'],
   ];
   static const _privEn = <List<String>>[
@@ -25,7 +25,7 @@ class LegalScreen extends StatelessWidget {
     ['3. Who can see what', 'Your posts, profile and comments are visible to other users of the app. Your email and full date of birth are never shown to others. Messages are visible only to the people in the chat.'],
     ['4. Services we use', 'Data is stored with Supabase and photos and videos with Cloudinary. These providers process information only to provide the service.'],
     ['5. Your rights', 'You can edit or delete your posts, birthday and profile at any time. To have your account and data deleted, write to us from Contact in the app.'],
-    ['6. Minors', 'GamingSocial is only for people aged 18 or over. If we find an account belonging to a minor, we delete it.'],
+    ['6. Minors', 'GamersLore is only for people aged 18 or over. If we find an account belonging to a minor, we delete it.'],
     ['7. Changes', 'We may update this policy. If you keep using the app after a change, you accept it.'],
   ];
   static const _secEs = <List<String>>[

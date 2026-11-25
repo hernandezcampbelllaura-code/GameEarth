@@ -59,7 +59,7 @@ class Safety {
           title: const Text('Contenido no permitido'),
           content: const Text(
             'Tu texto parece tener lenguaje ofensivo o sexual, que está '
-            'prohibido en GamingSocial. Cámbialo e inténtalo de nuevo.',
+            'prohibido en GamersLore. Cámbialo e inténtalo de nuevo.',
           ),
           actions: [
             FilledButton(

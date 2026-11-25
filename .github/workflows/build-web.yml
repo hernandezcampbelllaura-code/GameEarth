@@ -48,7 +48,7 @@ jobs:
           rm -rf lib test
           cp -r "$RUNNER_TEMP/lib_bak" lib
           cp "$RUNNER_TEMP/pubspec_bak.yaml" pubspec.yaml
-          sed -i 's#<title>[^<]*</title>#<title>GamingSocial</title>#' web/index.html
+          sed -i 's#<title>[^<]*</title>#<title>GamersLore</title>#' web/index.html
           if [ -f app_icon.png ] && command -v convert >/dev/null; then
             convert app_icon.png -resize 192x192 web/icons/Icon-192.png
             convert app_icon.png -resize 512x512 web/icons/Icon-512.png
@@ -72,7 +72,7 @@ jobs:
                  'border-top-color:#7C4DFF;border-radius:50%;animation:s 1s linear infinite}'
                  '@keyframes s{to{transform:rotate(360deg)}}</style>')
           splash = ('<div id="splash"><img src="icons/Icon-192.png" width="96" height="96" alt="">'
-                    '<b>GamingSocial</b><i></i></div>')
+                    '<b>GamersLore</b><i></i></div>')
           s = s.replace('</head>', css + '</head>', 1)
           s = s.replace('<body>', '<body>' + splash, 1)
           open(p, 'w', encoding='utf-8').write(s)
@@ -95,12 +95,13 @@ jobs:
       - run: flutter pub get
 
       - name: Build web
-        run: flutter build web --release --no-web-resources-cdn --pwa-strategy=none --dart-define=APP_VERSION=${{ github.sha }} --base-href "/${{ github.event.repository.name }}/"
+        run: flutter build web --release --no-web-resources-cdn --pwa-strategy=none --dart-define=APP_VERSION=${{ github.sha }} --base-href "/"
 
       - name: Version file
         run: |
           echo '{"v":"${{ github.sha }}"}' > build/web/version.json
           cp conexion.html build/web/conexion.html
+          echo gamerslore.com > build/web/CNAME
 
       - uses: actions/upload-pages-artifact@v3
         with:

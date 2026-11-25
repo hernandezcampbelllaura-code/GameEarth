@@ -17,7 +17,7 @@ Future<bool> showRatingDialog(BuildContext context) async {
     barrierDismissible: false,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setD) => AlertDialog(
-        title: const Text('¿Qué te parece GamingSocial?'),
+        title: const Text('¿Qué te parece GamersLore?'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

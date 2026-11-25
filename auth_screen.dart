@@ -213,7 +213,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   const Icon(Icons.sports_esports, size: 72),
                   const SizedBox(height: 8),
                   Text(
-                    'GamingSocial',
+                    'GamersLore',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   TextButton.icon(
@@ -354,7 +354,7 @@ class TermsScreen extends StatelessWidget {
   static const List<List<String>> _sections = [
     [
       '1. Edad mínima',
-      'GamingSocial es solo para personas de 18 años o más. Al crear una cuenta '
+      'GamersLore es solo para personas de 18 años o más. Al crear una cuenta '
           'confirmas que cumples este requisito.',
     ],
     [
@@ -393,7 +393,7 @@ class TermsScreen extends StatelessWidget {
     [
       '7. Tu contenido y tu cuenta',
       'Eres responsable de lo que publicas y de mantener segura tu contraseña. '
-          'Al publicar permites que GamingSocial muestre tu contenido a otros '
+          'Al publicar permites que GamersLore muestre tu contenido a otros '
           'usuarios dentro de la aplicación.',
     ],
     [

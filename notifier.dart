@@ -59,7 +59,7 @@ class Notifier {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'gs_main',
-          'Avisos de GamingSocial',
+          'Avisos de GamersLore',
           importance: Importance.high,
           priority: Priority.high,
         ),
