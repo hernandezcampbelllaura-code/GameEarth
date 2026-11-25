@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart' hide Text;
@@ -182,4 +183,51 @@ Future<void> showContactDialog(BuildContext context) {
       ],
     ),
   );
+}
+
+
+final Map<String, String> _trCache = {};
+
+/// Idioma de destino para traducir publicaciones (es, en, fr, pt, de, ru).
+String targetLang() => L.base;
+
+/// Traduce un texto (cualquier idioma) al idioma elegido en la app.
+/// Devuelve null si no se pudo. Usa servicios gratuitos, con respaldo.
+Future<String?> translateText(String text, String target) async {
+  final key = '$target|$text';
+  final hit = _trCache[key];
+  if (hit != null) return hit;
+  final q = text.length > 1500 ? text.substring(0, 1500) : text;
+  try {
+    final r = await http
+        .get(Uri.https('translate.googleapis.com', '/translate_a/single', {
+          'client': 'gtx',
+          'sl': 'auto',
+          'tl': target,
+          'dt': 't',
+          'q': q,
+        }))
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode == 200) {
+      final j = jsonDecode(utf8.decode(r.bodyBytes)) as List;
+      final out = (j[0] as List).map((e) => (e as List)[0] as String).join();
+      if (out.trim().isNotEmpty) return _trCache[key] = out;
+    }
+  } catch (_) {}
+  try {
+    final r = await http
+        .get(Uri.https('api.mymemory.translated.net', '/get', {
+          'q': q.length > 450 ? q.substring(0, 450) : q,
+          'langpair': 'autodetect|$target',
+        }))
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode == 200) {
+      final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map;
+      final out = (j['responseData']?['translatedText'] ?? '') as String;
+      if (out.trim().isNotEmpty && j['responseStatus'].toString() == '200') {
+        return _trCache[key] = out;
+      }
+    }
+  } catch (_) {}
+  return null;
 }

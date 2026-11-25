@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' as m;
 import 'package:flutter/material.dart' hide Text;
 import '../l10n.dart';
 import 'package:video_player/video_player.dart';
@@ -252,7 +253,7 @@ class PostCard extends StatelessWidget {
           if (text.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 10, right: 6),
-              child: Text(text, style: const TextStyle(fontSize: 15)),
+              child: _TranslatableText(text),
             ),
           if (img.isNotEmpty)
             Padding(
@@ -478,6 +479,62 @@ class _VideoBoxState extends State<_VideoBox> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Texto de la publicación con botón "Traducir" / "Ver original".
+class _TranslatableText extends StatefulWidget {
+  const _TranslatableText(this.text);
+  final String text;
+  @override
+  State<_TranslatableText> createState() => _TranslatableTextState();
+}
+
+class _TranslatableTextState extends State<_TranslatableText> {
+  String? _translated;
+  bool _show = false;
+  bool _busy = false;
+
+  Future<void> _go() async {
+    if (_translated != null) {
+      setState(() => _show = !_show);
+      return;
+    }
+    setState(() => _busy = true);
+    final r = await translateText(widget.text, targetLang());
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _translated = r;
+      _show = r != null;
+    });
+    if (r == null) toast(context, 'No se pudo traducir. Inténtalo de nuevo.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        m.Text(_show ? _translated! : widget.text,
+            style: const TextStyle(fontSize: 15)),
+        InkWell(
+          onTap: _busy ? null : _go,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              _busy ? 'Traduciendo…' : (_show ? 'Ver original' : 'Traducir'),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

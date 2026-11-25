@@ -1,5 +1,9 @@
 // Generado: textos traducidos (clave = español). Orden: en, fr, pt, de, ru.
 const Map<String, List<String>> kTr = {
+  'Traducir': ['Translate', 'Traduire', 'Traduzir', 'Übersetzen', 'Перевести'],
+  'Ver original': ['See original', 'Voir l’original', 'Ver original', 'Original anzeigen', 'Показать оригинал'],
+  'Traduciendo…': ['Translating…', 'Traduction…', 'Traduzindo…', 'Wird übersetzt …', 'Перевод…'],
+  'No se pudo traducir. Inténtalo de nuevo.': ['Could not translate. Try again.', 'Traduction impossible. Réessaie.', 'Não foi possível traduzir. Tente novamente.', 'Übersetzung nicht möglich. Versuche es erneut.', 'Не удалось перевести. Повторите.'],
   'ahora': ['now', 'maintenant', 'agora', 'jetzt', 'сейчас'],
   'hace {n} min': ['{n} min ago', 'il y a {n} min', 'há {n} min', 'vor {n} Min.', '{n} мин назад'],
   'hace {n} h': ['{n} h ago', 'il y a {n} h', 'há {n} h', 'vor {n} Std.', '{n} ч назад'],
