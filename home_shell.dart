@@ -132,7 +132,7 @@ class _HomeShellState extends State<HomeShell> {
 
         return LayoutBuilder(
           builder: (context, c) {
-            if (c.maxWidth >= 600) {
+            if (false) {
               final wide = c.maxWidth >= 1000;
               final contentMax = c.maxWidth >= 1400
                   ? 1000.0
@@ -169,8 +169,14 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               );
             }
+            final contentMax = c.maxWidth >= 1000 ? 1200.0 : double.infinity;
             return Scaffold(
-              body: body,
+              body: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: contentMax),
+                  child: body,
+                ),
+              ),
               bottomNavigationBar: NavigationBar(
                 selectedIndex: index,
                 onDestinationSelected: (i) => setState(() => _index = i),
