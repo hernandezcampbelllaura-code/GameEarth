@@ -132,13 +132,20 @@ class _HomeShellState extends State<HomeShell> {
 
         return LayoutBuilder(
           builder: (context, c) {
-            if (c.maxWidth >= 720) {
+            if (c.maxWidth >= 600) {
+              final wide = c.maxWidth >= 1000;
+              final contentMax = c.maxWidth >= 1400
+                  ? 1000.0
+                  : (wide ? 860.0 : double.infinity);
               return Scaffold(
                 body: Row(
                   children: [
                     NavigationRail(
                       selectedIndex: index,
-                      labelType: NavigationRailLabelType.all,
+                      extended: wide,
+                      labelType: wide
+                          ? NavigationRailLabelType.none
+                          : NavigationRailLabelType.all,
                       onDestinationSelected: (i) => setState(() => _index = i),
                       destinations: [
                         for (final d in dests)
@@ -153,7 +160,7 @@ class _HomeShellState extends State<HomeShell> {
                     Expanded(
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
+                          constraints: BoxConstraints(maxWidth: contentMax),
                           child: body,
                         ),
                       ),
