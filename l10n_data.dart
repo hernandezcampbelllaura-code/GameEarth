@@ -1,5 +1,8 @@
 // Generado: textos traducidos (clave = español). Orden: en, fr, pt, de, ru.
 const Map<String, List<String>> kTr = {
+  'Nueva contraseña': ['New password', 'Nouveau mot de passe', 'Nova senha', 'Neues Passwort', 'Новый пароль'],
+  'Escribe tu nueva contraseña': ['Enter your new password', 'Saisis ton nouveau mot de passe', 'Digite sua nova senha', 'Gib dein neues Passwort ein', 'Введите новый пароль'],
+  'No se pudo cambiar la contraseña. Pide otro enlace.': ['Could not change the password. Request a new link.', 'Impossible de changer le mot de passe. Demande un nouveau lien.', 'Não foi possível alterar a senha. Peça um novo link.', 'Passwort konnte nicht geändert werden. Fordere einen neuen Link an.', 'Не удалось сменить пароль. Запросите новую ссылку.'],
   'Traducir': ['Translate', 'Traduire', 'Traduzir', 'Übersetzen', 'Перевести'],
   'Ver original': ['See original', 'Voir l’original', 'Ver original', 'Original anzeigen', 'Показать оригинал'],
   'Traduciendo…': ['Translating…', 'Traduction…', 'Traduzindo…', 'Wird übersetzt …', 'Перевод…'],

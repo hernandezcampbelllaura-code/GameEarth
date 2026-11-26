@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Text;
 
+import '../config.dart';
 import '../net.dart';
 import '../services/db.dart';
 import '../util.dart';
@@ -60,7 +61,7 @@ class SettingsScreen extends StatelessWidget {
               if (!await requireOnline(context, 'cambiar la contraseña')) return;
               if (!context.mounted) return;
               await guard(context, () async {
-                await sb.auth.resetPasswordForEmail(email);
+                await sb.auth.resetPasswordForEmail(email, redirectTo: kWebUrl);
                 if (context.mounted) {
                   toast(context, 'Te enviamos un enlace a $email');
                 }

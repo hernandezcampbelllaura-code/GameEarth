@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide Text;
 import 'legal_screen.dart';
 import 'help_screen.dart';
 
+import '../config.dart';
 import '../net.dart';
 import '../safety.dart';
 import '../services/db.dart';
@@ -86,6 +87,7 @@ class _AuthScreenState extends State<AuthScreen> {
         final r = await sb.auth.signUp(
           email: _email.text.trim(),
           password: _pass.text,
+          emailRedirectTo: kWebUrl,
         );
         if (r.session == null && mounted) {
           TermsState.accepted = false;
@@ -145,7 +147,8 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
     try {
-      await sb.auth.resetPasswordForEmail(_email.text.trim());
+      await sb.auth.resetPasswordForEmail(_email.text.trim(),
+          redirectTo: kWebUrl);
       setState(() => _error = 'Te enviamos un correo para restablecerla.');
     } on AuthException catch (e) {
       setState(() => _error = _message((e.code ?? e.message).toString(), e.message));

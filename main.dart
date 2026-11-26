@@ -11,11 +11,12 @@ import 'net.dart';
 import 'notifier.dart';
 import 'services/db.dart';
 import 'screens/auth_screen.dart';
+import 'screens/new_password_screen.dart';
 import 'screens/banned_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/profile_setup_screen.dart';
 import 'theme.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, AuthState;
+import 'package:supabase_flutter/supabase_flutter.dart' show Supabase, AuthState, AuthChangeEvent;
 
 /// La app se dibuja al instante (pantalla de inicio) y la conexión se prepara
 /// por detrás, para que nunca se vea una pantalla en blanco.
@@ -216,11 +217,38 @@ class _LoaderState extends State<_Loader> {
 }
 
 /// Decide qué pantalla mostrar: login, crear perfil, baneado o la app.
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _recovery = false;
+  StreamSubscription<AuthState>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = sb.auth.onAuthStateChange.listen((s) {
+      if (s.event == AuthChangeEvent.passwordRecovery && mounted) {
+        setState(() => _recovery = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_recovery) {
+      return NewPasswordScreen(onDone: () => setState(() => _recovery = false));
+    }
     return StreamBuilder<AuthState>(
       stream: sb.auth.onAuthStateChange,
       builder: (context, snap) {
