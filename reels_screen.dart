@@ -102,6 +102,7 @@ class _ReelPageState extends State<_ReelPage> {
     _viewTimer?.cancel();
     final id = widget.doc.id;
     final author = (widget.doc.data()?['authorId'] ?? '') as String;
+    Taste.remember(id, widget.doc.data() ?? {});
     _viewTimer = Timer(
       const Duration(seconds: 2),
       () => Db.registerView(id, author),

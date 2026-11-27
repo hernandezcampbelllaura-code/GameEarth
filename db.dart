@@ -343,23 +343,38 @@ class Db {
 
   /// Reacciona a una publicación. Si ya tenías esa misma reacción, la quita;
   /// si tenías otra, la cambia.
+  static final Set<String> _reacting = {};
+
   static Future<void> react(String postId, String type) async {
+    // Evita toques dobles: mientras una reacción se guarda, se ignora la siguiente.
+    if (!_reacting.add(postId)) return;
     final mine = Session.i.myLikes;
-    final cur = mine.value[postId];
-    if (cur == null) {
-      await sb.from('likes').insert({'post_id': postId, 'type': type});
-      mine.value = {...mine.value, postId: type};
-    } else if (cur == type) {
-      await sb.from('likes').delete().eq('post_id', postId).eq('user_id', myUid);
-      final m = {...mine.value}..remove(postId);
-      mine.value = m;
-    } else {
-      await sb
-          .from('likes')
-          .update({'type': type})
-          .eq('post_id', postId)
-          .eq('user_id', myUid);
-      mine.value = {...mine.value, postId: type};
+    final before = mine.value;
+    try {
+      final cur = before[postId];
+      if (cur == type) {
+        mine.value = {...before}..remove(postId);
+        await sb
+            .from('likes')
+            .delete()
+            .eq('post_id', postId)
+            .eq('user_id', myUid);
+        Taste.bump(postId, -3);
+      } else {
+        mine.value = {...before, postId: type};
+        await sb.from('likes').upsert(
+          {'post_id': postId, 'user_id': myUid, 'type': type},
+          onConflict: 'post_id,user_id',
+        );
+        if (cur == null) Taste.bump(postId, 3);
+      }
+    } catch (e) {
+      mine.value = before;
+      final msg = '$e';
+      if (msg.contains('23505') || msg.contains('duplicate key')) return;
+      rethrow;
+    } finally {
+      _reacting.remove(postId);
     }
   }
 
@@ -539,6 +554,7 @@ class Db {
   /// Suma una visita (una sola por persona). No cuenta las del propio autor.
   static Future<void> registerView(String postId, String authorId) async {
     if (authorId == myUid || !_seenViews.add(postId)) return;
+    Taste.bump(postId, 1);
     try {
       await sb.from('views').upsert({'post_id': postId, 'user_id': myUid},
           onConflict: 'post_id,user_id', ignoreDuplicates: true);
@@ -559,6 +575,7 @@ class Db {
       'parent_id': parentId,
       'reply_to_name': replyToName,
     });
+    Taste.bump(postId, 4);
   }
 
   static Future<void> deleteComment(String postId, String commentId) async {
@@ -695,6 +712,7 @@ class Session {
   final List<StreamSubscription<dynamic>> _subs = [];
 
   void start(String uid) {
+    Taste.load();
     stop();
     _subs.add(Db.watchProfile(uid).listen(
       (d) => username = (d.data()['username'] as String?) ?? username,
@@ -749,6 +767,7 @@ class Session {
     following.value = {};
     isAdmin.value = false;
     myLikes.value = {};
+    Taste.clear();
     myVotes.value = {};
   }
 }
@@ -865,5 +884,101 @@ class Media {
       throw const MediaException('Respuesta inesperada al subir el archivo.');
     }
     return url;
+  }
+}
+
+
+/// Gustos de cada persona: de qué autores y de qué temas reacciona, comenta o ve más.
+/// Se guarda en la cuenta (tabla user_taste) para que valga en la web y en la app.
+class Taste {
+  static final Map<String, double> authors = {};
+  static final Map<String, double> words = {};
+  static final Map<String, List<String>> _seen = {};
+  static Timer? _timer;
+
+  static const _stop = {
+    'este', 'esta', 'esto', 'esos', 'esas', 'para', 'pero', 'como', 'porque',
+    'cuando', 'donde', 'todo', 'toda', 'todos', 'muy', 'mas', 'más', 'con',
+    'sin', 'sobre', 'entre', 'desde', 'hasta', 'that', 'this', 'with', 'from',
+    'have', 'what', 'your', 'they', 'will', 'about', 'ahora', 'hoy', 'jaja',
+  };
+
+  static List<String> _wordsOf(String text) {
+    final out = <String>{};
+    for (final w in text.toLowerCase().split(RegExp(r'[^a-záéíóúñü0-9]+'))) {
+      if (w.length >= 4 && !_stop.contains(w)) out.add(w);
+      if (out.length >= 8) break;
+    }
+    return out.toList();
+  }
+
+  static Future<void> load() async {
+    authors.clear();
+    words.clear();
+    try {
+      final row = await sb
+          .from('user_taste')
+          .select('data')
+          .eq('user_id', myUid)
+          .maybeSingle();
+      final d = (row?['data'] ?? {}) as Map;
+      ((d['a'] ?? {}) as Map).forEach((k, v) => authors['$k'] = (v as num).toDouble() * 0.95);
+      ((d['w'] ?? {}) as Map).forEach((k, v) => words['$k'] = (v as num).toDouble() * 0.95);
+    } catch (_) {}
+  }
+
+  static void clear() {
+    authors.clear();
+    words.clear();
+    _seen.clear();
+    _timer?.cancel();
+  }
+
+  /// Recuerda de quién y de qué trata una publicación vista.
+  static void remember(String postId, Map<String, dynamic> d) {
+    if (_seen.containsKey(postId)) return;
+    if (_seen.length > 300) _seen.clear();
+    _seen[postId] = ['${d['authorId']}', ..._wordsOf('${d['text'] ?? ''}')];
+  }
+
+  /// Suma (o resta) interés por una publicación: reacción +3, comentario +4, visita +1.
+  static void bump(String postId, double w) {
+    final s = _seen[postId];
+    if (s == null) return;
+    final a = s.first;
+    if (a.isNotEmpty && a != myUid) authors[a] = (authors[a] ?? 0) + w;
+    for (final k in s.skip(1)) {
+      words[k] = (words[k] ?? 0) + w * 0.5;
+    }
+    _timer?.cancel();
+    _timer = Timer(const Duration(seconds: 8), _save);
+  }
+
+  /// Cuánto le debería gustar esta publicación (0 si no hay datos).
+  static double affinity(Map<String, dynamic> d) {
+    final a = ((authors['${d['authorId']}'] ?? 0) * 0.25).clamp(0.0, 1.5);
+    final ws = _wordsOf('${d['text'] ?? ''}')
+        .map((k) => words[k] ?? 0.0)
+        .where((v) => v > 0)
+        .toList()
+      ..sort((x, y) => y.compareTo(x));
+    final w = (ws.take(3).fold<double>(0, (p, v) => p + v) * 0.1).clamp(0.0, 1.0);
+    return a + w;
+  }
+
+  static Map<String, double> _top(Map<String, double> m, int n) {
+    final e = m.entries.where((e) => e.value >= 0.3).toList()
+      ..sort((x, y) => y.value.compareTo(x.value));
+    return {for (final x in e.take(n)) x.key: double.parse(x.value.toStringAsFixed(2))};
+  }
+
+  static Future<void> _save() async {
+    try {
+      await sb.from('user_taste').upsert({
+        'user_id': myUid,
+        'data': {'a': _top(authors, 40), 'w': _top(words, 60)},
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id');
+    } catch (_) {}
   }
 }

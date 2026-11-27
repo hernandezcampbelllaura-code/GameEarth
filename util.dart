@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'config.dart';
-import 'services/db.dart' show Doc;
+import 'services/db.dart' show Doc, Taste;
 
 String formatDate(dynamic ts) {
   if (ts is! DateTime) return tr('ahora');
@@ -237,7 +237,8 @@ Future<String?> translateText(String text, String target) async {
 
 /// Puntuación de una publicación para el feed "Para ti".
 /// Premia interacción (vistas, reacciones, comentarios) y novedad, y baja con las horas.
-double postScore(Map<String, dynamic> d, {required bool followed, DateTime? now}) {
+double postScore(Map<String, dynamic> d,
+    {required bool followed, DateTime? now, double affinity = 0}) {
   num n(String k) => (d[k] is num) ? d[k] as num : 0;
   final created = d['createdAt'];
   final t = created is DateTime ? created : DateTime.tryParse('$created');
@@ -248,6 +249,7 @@ double postScore(Map<String, dynamic> d, {required bool followed, DateTime? now}
       1 + n('views') * 0.2 + n('likesCount') * 2 + n('commentsCount') * 3;
   var score = engagement / math.pow(age + 2, 1.3);
   if (followed) score *= 1.6; // quien sigues pesa más
+  score *= 1 + affinity; // tus gustos
   if (age < 1) score *= 1.5; // las nuevas tienen su oportunidad
   return score;
 }
@@ -264,7 +266,9 @@ List<String> rankPosts(
         d.id,
         '${d.data()['authorId']}',
         postScore(d.data(),
-            followed: following.contains(d.data()['authorId']), now: now),
+            followed: following.contains(d.data()['authorId']),
+            now: now,
+            affinity: Taste.affinity(d.data())),
       ),
   ];
   final out = <String>[];

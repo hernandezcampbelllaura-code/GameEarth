@@ -140,6 +140,7 @@ class PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Taste.remember(doc.id, doc.data());
     final d = doc.data() ?? <String, dynamic>{};
     final authorId = (d['authorId'] ?? '') as String;
     final author = (d['authorName'] ?? 'usuario') as String;
