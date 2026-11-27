@@ -188,4 +188,28 @@ void main() {
       expect(L.detect(const Locale('ja')), 'en');
     });
   });
+
+  group('Ranking del feed', () {
+    final now = DateTime(2026, 11, 26, 12);
+    Map<String, dynamic> p(int hoursAgo,
+            {int views = 0, int likes = 0, int comments = 0}) =>
+        {
+          'createdAt': now.subtract(Duration(hours: hoursAgo)),
+          'views': views,
+          'likesCount': likes,
+          'commentsCount': comments,
+        };
+    test('más interacción sube', () {
+      expect(postScore(p(5, views: 100, likes: 20), followed: false, now: now),
+          greaterThan(postScore(p(5), followed: false, now: now)));
+    });
+    test('lo viejo baja', () {
+      expect(postScore(p(2, likes: 5), followed: false, now: now),
+          greaterThan(postScore(p(72, likes: 5), followed: false, now: now)));
+    });
+    test('quien sigues pesa más', () {
+      expect(postScore(p(5, likes: 3), followed: true, now: now),
+          greaterThan(postScore(p(5, likes: 3), followed: false, now: now)));
+    });
+  });
 }

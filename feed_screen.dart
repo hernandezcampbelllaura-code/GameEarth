@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Text;
 import '../l10n.dart';
 
 import '../net.dart';
+import '../util.dart';
 import '../services/db.dart';
 import '../widgets/post_card.dart';
 import 'chats_screen.dart';
@@ -19,7 +20,22 @@ class _FeedScreenState extends State<FeedScreen> {
   late final Stream<Snap> _stream =
       Db.watchPosts();
 
-  Widget _list(List<Doc> docs, String empty) {
+  List<String> _order = [];
+
+  /// Orden "Para ti": se calcula al abrir y al refrescar; las nuevas entran arriba.
+  List<Doc> _ranked(List<Doc> visible, Set<String> following) {
+    final byId = {for (final d in visible) d.id: d};
+    if (_order.isEmpty) {
+      _order = rankPosts(visible, following);
+    } else {
+      final known = _order.toSet();
+      final fresh = visible.where((d) => !known.contains(d.id)).toList();
+      _order = [...rankPosts(fresh, following), ..._order];
+    }
+    return [for (final id in _order) if (byId[id] != null) byId[id]!];
+  }
+
+  Widget _list(List<Doc> docs, String empty, {bool refresh = false}) {
     if (docs.isEmpty) {
       return Center(
         child: Padding(
@@ -28,10 +44,16 @@ class _FeedScreenState extends State<FeedScreen> {
         ),
       );
     }
-    return ListView.builder(
+    final list = ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 6, bottom: 24),
       itemCount: docs.length,
       itemBuilder: (_, i) => PostCard(key: ValueKey(docs[i].id), doc: docs[i]),
+    );
+    if (!refresh) return list;
+    return RefreshIndicator(
+      onRefresh: () async => setState(() => _order = []),
+      child: list,
     );
   }
 
@@ -100,7 +122,9 @@ class _FeedScreenState extends State<FeedScreen> {
                     }).toList();
                     return TabBarView(
                       children: [
-                        _list(visible, 'Aún no hay publicaciones.\n¡Sé el primero en publicar!'),
+                        _list(_ranked(visible, following),
+            'Aún no hay publicaciones.\n¡Sé el primero en publicar!',
+            refresh: true),
                         _list(
                           fromFollowed,
                           'Aquí verás lo que publiquen las personas que sigues.\nUsa Buscar para encontrar jugadores.',

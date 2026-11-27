@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'config.dart';
+import 'services/db.dart' show Doc;
 
 String formatDate(dynamic ts) {
   if (ts is! DateTime) return tr('ahora');
@@ -230,4 +232,57 @@ Future<String?> translateText(String text, String target) async {
     }
   } catch (_) {}
   return null;
+}
+
+
+/// Puntuación de una publicación para el feed "Para ti".
+/// Premia interacción (vistas, reacciones, comentarios) y novedad, y baja con las horas.
+double postScore(Map<String, dynamic> d, {required bool followed, DateTime? now}) {
+  num n(String k) => (d[k] is num) ? d[k] as num : 0;
+  final created = d['createdAt'];
+  final t = created is DateTime ? created : DateTime.tryParse('$created');
+  final age = t == null
+      ? 24.0
+      : ((now ?? DateTime.now()).difference(t).inMinutes / 60.0).clamp(0.0, 24 * 365);
+  final engagement =
+      1 + n('views') * 0.2 + n('likesCount') * 2 + n('commentsCount') * 3;
+  var score = engagement / math.pow(age + 2, 1.3);
+  if (followed) score *= 1.6; // quien sigues pesa más
+  if (age < 1) score *= 1.5; // las nuevas tienen su oportunidad
+  return score;
+}
+
+/// Ordena ids por puntuación evitando muchas seguidas del mismo autor.
+List<String> rankPosts(
+  List<Doc> docs,
+  Set<String> following, {
+  DateTime? now,
+}) {
+  final left = <_Scored>[
+    for (final d in docs)
+      _Scored(
+        d.id,
+        '${d.data()['authorId']}',
+        postScore(d.data(),
+            followed: following.contains(d.data()['authorId']), now: now),
+      ),
+  ];
+  final out = <String>[];
+  final used = <String, int>{};
+  while (left.isNotEmpty) {
+    left.sort((a, b) =>
+        (b.score * math.pow(0.7, used[b.author] ?? 0))
+            .compareTo(a.score * math.pow(0.7, used[a.author] ?? 0)));
+    final x = left.removeAt(0);
+    out.add(x.id);
+    used[x.author] = (used[x.author] ?? 0) + 1;
+  }
+  return out;
+}
+
+class _Scored {
+  _Scored(this.id, this.author, this.score);
+  final String id;
+  final String author;
+  final double score;
 }
